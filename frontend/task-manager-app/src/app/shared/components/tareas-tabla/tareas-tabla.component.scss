@@ -1,0 +1,359 @@
+:host {
+  display: block;
+  border-radius: 8px;
+  border: 1px solid var(--app-border);
+  // No "overflow: hidden" aca: Tabulator calcula su propia altura segun
+  // el contenido (ver `height` omitido en initTabla). Con overflow
+  // hidden y sin una altura fija en el host, la tabla quedaba recortada
+  // a 0px y se veia "rota".
+  overflow-x: auto;
+}
+
+.tareas-tabla-tabulator {
+  width: 100%;
+  min-width: 640px;
+}
+
+// Buscador unico (reemplaza los inputs por columna que tenia cada
+// header-filter de texto): busca por Tarea/Proyecto/Asignada a/Creada
+// por a la vez (ver onBuscar/coincideBusqueda en el .ts). Los filtros
+// de Rol/Estado siguen siendo dropdowns en su propio encabezado de
+// columna, esos no se tocan.
+//
+// Mismo azul que el header de Tabulator (ver ::ng-deep abajo) y sin
+// borde entre ambos: se ven como un solo bloque azul continuo, la
+// franja del buscador arriba y el encabezado de columnas justo debajo.
+// Ocupa todo el ancho de la tabla, pero el input en si es una caja
+// blanca angosta (30%, redondeada) pegada a la izquierda — no un campo
+// que estira de borde a borde.
+.tareas-tabla-buscador {
+  display: flex;
+  padding: 14px 16px;
+  background: var(--app-blue);
+}
+
+.tareas-tabla-buscador__caja {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 30%;
+  min-width: 200px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--app-surface);
+}
+
+.tareas-tabla-buscador__icono {
+  color: var(--app-text-subtle);
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.tareas-tabla-buscador__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 13.5px;
+  background: transparent;
+  color: var(--app-text);
+
+  &::placeholder {
+    color: var(--app-text-subtle);
+  }
+
+  // Quita la "x" nativa de type=search en Chrome/Edge para no duplicar
+  // con el icono de lupa del lado izquierdo.
+  &::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+  }
+}
+
+// Tabulator no pasa por la vista encapsulada del componente (arma su
+// propio DOM a mano dentro del div), asi que las reglas de paleta van
+// con ::ng-deep. Se sobreescribe el tema "simple" (importado global en
+// angular.json) en vez de traer uno propio desde cero.
+//
+// TODO/gotcha importante: el tema trae selectores MUY especificos
+// (ej. ".tabulator .tabulator-header .tabulator-col .tabulator-col-content
+// .tabulator-col-title" = 5 clases). Nuestro selector acostumbra ser
+// ".tareas-tabla-tabulator .tabulator-col-title" = 2 clases: pierde
+// SIEMPRE contra el tema por especificidad, sin importar el orden en
+// que se cargan las hojas de estilo (asi fue como el azul del header
+// "no se veia": no era un problema de cache ni de orden en angular.json,
+// era que el override nunca ganaba). Por eso todo lo de aca abajo que
+// pisa una clase nativa de Tabulator lleva !important — es el patron
+// estandar para re-skinnear un tema de una libreria de terceros.
+::ng-deep .tareas-tabla-tabulator {
+  font-family: inherit;
+  font-size: 13.5px;
+
+  // Encabezado en azul solido (no un borde/marco de acento sobre fondo
+  // claro como antes): es lo que "resalta" el header, sin lineas
+  // divisorias entre columnas.
+  .tabulator-header {
+    background: var(--app-blue) !important;
+    border-bottom: none !important;
+  }
+
+  .tabulator-col {
+    background: transparent !important;
+    border-right: none !important;
+  }
+
+  // Mas aire alrededor del titulo de columna: el tema trae 4px de
+  // padding en .tabulator-col-content, se sentia apretado.
+  .tabulator-col-content {
+    padding: 10px 14px !important;
+  }
+
+  .tabulator-col-title {
+    color: #fff !important;
+    font-weight: 700 !important;
+    font-size: 11.5px !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+  }
+
+  .tabulator-col .tabulator-arrow {
+    border-bottom-color: rgba(255, 255, 255, 0.7) !important;
+  }
+
+  .tabulator-col.tabulator-sortable:hover {
+    background: var(--app-blue-strong) !important;
+  }
+
+  // Los dropdown de Rol/Estado se quedan en el encabezado (a diferencia
+  // de los de texto, que se reemplazaron por el buscador unico de
+  // arriba): sin marco propio, redondeados en pildora (mismo lenguaje
+  // que la caja del buscador), con un tono translucido para que se lean
+  // sobre el azul solido.
+  //
+  // Gotcha: headerFilter:'list' NO renderiza un <select> nativo. Segun
+  // el propio codigo de Tabulator (function list() -> "return list.input"),
+  // el control visible es un <input type="text"> que abre un popup con
+  // la lista de opciones (el popup ademas se cuelga de document.body,
+  // fuera de este componente, asi que ni vale la pena intentar
+  // estilizarlo desde aca). El selector "select" de la version anterior
+  // nunca hizo nada porque ese elemento no existe.
+  .tabulator-header-filter {
+    // El contenedor del filtro tambien trae su propio padding chico en
+    // el tema; se agranda para que la pildora no quede pegada al borde
+    // de la columna.
+    padding: 2px 0 0 !important;
+  }
+
+  .tabulator-header-filter input {
+    border: none !important;
+    border-radius: 999px !important;
+    padding: 4px 12px !important;
+    font-size: 12.5px !important;
+    background: rgba(255, 255, 255, 0.18) !important;
+    color: #fff !important;
+    // El input trae "cursor: default" y "caret-color: transparent"
+    // puestos por Tabulator via JS (no eligen texto, abren el popup al
+    // hacer click): con eso ya se ve/actua como un dropdown, no hace
+    // falta tocar nada mas aca.
+  }
+
+  .tabulator-header-filter input::placeholder {
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .tabulator-row {
+    min-height: 52px !important;
+    background: var(--app-surface) !important;
+    border-bottom: 1px solid var(--app-border) !important;
+  }
+
+  // Zebra striping: igual que el resto de tablas del proyecto que ya
+  // usan surface-subtle para filas alternas.
+  .tabulator-row.tabulator-row-even {
+    background: var(--app-surface-subtle) !important;
+  }
+
+  .tabulator-row:hover {
+    background: var(--app-blue-soft) !important;
+  }
+
+  .tabulator-row.tabulator-selected {
+    background: var(--app-blue-soft) !important;
+  }
+
+  .tabulator-row .tabulator-cell {
+    border-right: none !important;
+    // Mismo motivo que .tabulator-col-content arriba: el tema trae solo
+    // 4px de padding, el texto quedaba pegado a los bordes de la celda.
+    padding: 10px 14px !important;
+  }
+
+  // La celda de tarea se ve como un enlace: es la que abre el modal, y
+  // ademas de que toda la fila responde al click, esta lo deja obvio a
+  // simple vista.
+  .tabulator-cell.celda-titulo {
+    color: var(--app-blue-strong) !important;
+    font-weight: 500 !important;
+    cursor: pointer;
+  }
+
+  .tabulator-row:hover .tabulator-cell.celda-titulo {
+    text-decoration: underline;
+  }
+
+  .tabulator-cell[tabulator-field='status'] {
+    cursor: pointer;
+  }
+
+  .tabulator-cell.tabulator-editing {
+    border: 1px solid var(--app-blue) !important;
+  }
+
+  .tabulator-cell.tabulator-editing select {
+    border: none !important;
+    outline: none;
+    font-size: inherit;
+  }
+
+  .tabulator-placeholder {
+    color: var(--app-text-subtle) !important;
+  }
+
+  // ---------- Pie / paginacion ----------
+
+  .tabulator-footer {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px !important;
+    background: var(--app-surface-subtle) !important;
+    border-top: 1px solid var(--app-border) !important;
+  }
+
+  .tabulator-footer-contents {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .tabulator-paginator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12.5px !important;
+    color: var(--app-text-muted);
+  }
+
+  .tabulator-page {
+    border: 1px solid var(--app-border-strong) !important;
+    border-radius: 999px !important;
+    background: var(--app-surface) !important;
+    color: var(--app-text) !important;
+    padding: 5px 14px !important;
+    font-size: 12.5px !important;
+
+    &:hover:not(:disabled) {
+      border-color: var(--app-blue) !important;
+      color: var(--app-blue-strong) !important;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+    }
+  }
+
+  .tabulator-page.active {
+    background: var(--app-blue) !important;
+    border-color: var(--app-blue) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(57, 133, 236, 0.25);
+  }
+
+  .tabulator-page-size {
+    border: 1px solid var(--app-border-strong) !important;
+    border-radius: 999px !important;
+    padding: 5px 12px !important;
+    font-size: 12.5px !important;
+    background: var(--app-surface) !important;
+  }
+
+  .tabulator-paginator-count {
+    color: var(--app-text-subtle);
+    font-size: 12.5px;
+  }
+}
+
+// El pill de estado necesita quedar fuera del anidamiento anterior
+// tambien (esta bien igual con ::ng-deep global, pero se agrupa aparte
+// por claridad ya que lo arma el formatter, no Tabulator). Son clases
+// propias (no existen en el tema), no hace falta !important aca.
+//
+// Un color por estado (border + texto en ese color, fondo en su
+// variante "-soft"), no una progresion de 3 tonos: con 8 estados
+// agruparlos se volvia dificil de distinguir de un vistazo. Los colores
+// viven en styles.scss (--estado-*) para que tarea-card use los mismos.
+::ng-deep .badge-estado {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 13px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+::ng-deep .badge-estado--creada {
+  background: var(--estado-creada-soft);
+  border-color: var(--estado-creada);
+  color: var(--estado-creada);
+}
+
+::ng-deep .badge-estado--asignada {
+  background: var(--estado-asignada-soft);
+  border-color: var(--estado-asignada);
+  color: var(--estado-asignada);
+}
+
+::ng-deep .badge-estado--leida {
+  background: var(--estado-leida-soft);
+  border-color: var(--estado-leida);
+  color: var(--estado-leida);
+}
+
+::ng-deep .badge-estado--en-atencion {
+  background: var(--estado-en-atencion-soft);
+  border-color: var(--estado-en-atencion);
+  color: var(--estado-en-atencion);
+}
+
+::ng-deep .badge-estado--atendida {
+  background: var(--estado-atendida-soft);
+  border-color: var(--estado-atendida);
+  color: var(--estado-atendida);
+}
+
+::ng-deep .badge-estado--volver-a-revisar {
+  background: var(--estado-volver-a-revisar-soft);
+  border-color: var(--estado-volver-a-revisar);
+  color: var(--estado-volver-a-revisar);
+}
+
+::ng-deep .badge-estado--terminada {
+  background: var(--estado-terminada-soft);
+  border-color: var(--estado-terminada);
+  color: var(--estado-terminada);
+}
+
+::ng-deep .badge-estado--cancelada {
+  background: var(--estado-cancelada-soft);
+  border-color: var(--estado-cancelada);
+  color: var(--estado-cancelada);
+}

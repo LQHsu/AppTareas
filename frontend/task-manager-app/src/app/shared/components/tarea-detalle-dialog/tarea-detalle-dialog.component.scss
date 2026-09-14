@@ -1,0 +1,55 @@
+:host {
+  display: block;
+  background: var(--app-surface);
+}
+
+.dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px 12px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.dialog__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+.dialog__cerrar {
+  color: var(--app-text-muted);
+}
+
+// Padding propio en vez del default de mat-dialog-content: el contenido
+// quedaba pegado a los bordes, sobre todo en movil.
+.dialog__body {
+  padding: 4px 24px 20px;
+  max-height: min(72vh, 720px);
+}
+
+.dialog__acciones {
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--app-border);
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .dialog__head {
+    padding: 14px 16px 10px;
+  }
+
+  .dialog__body {
+    // En movil el dialog ocupa toda la pantalla (ver .tarea-detalle-panel
+    // en styles.scss), asi que el cuerpo puede aprovechar mas alto.
+    padding: 4px 16px 16px;
+    max-height: calc(100vh - 132px);
+  }
+
+  .dialog__acciones {
+    padding: 10px 16px 14px;
+  }
+}

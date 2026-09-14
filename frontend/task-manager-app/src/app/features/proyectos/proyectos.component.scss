@@ -1,0 +1,260 @@
+.proyectos-page {
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+// 80% del ancho de pantalla en vez de un limite fijo en px: en
+// monitores anchos la pantalla se veia con mucho espacio muerto a los
+// lados. Solo arriba de 600px: en movil ya usa el 100% disponible
+// (menos, con 80vw, dejaria una franja vacia sin sentido).
+@media (min-width: 600px) {
+  .proyectos-page {
+    max-width: 80vw;
+  }
+}
+
+.proyectos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.proyectos-header h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.proyectos-header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.create-card {
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.create-field {
+  width: 100%;
+}
+
+.create-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--app-blue-soft);
+  color: var(--app-blue-strong);
+  font-size: 13px;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.proyectos-error {
+  color: var(--mat-sys-error, #b3261e);
+  margin-bottom: 16px;
+}
+
+.proyectos-loading,
+.proyectos-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.proyectos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.proyecto-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.proyecto-card:hover {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  // La tarjeta en reposo es blanca (--mat-card-elevated-container-color
+  // forzado en styles.scss); al pasar el mouse/tocarla vuelve a mostrar
+  // el tinte que Material genera por default, como retroalimentacion de
+  // que es clicable.
+  background: var(--mat-sys-surface-container-low);
+}
+
+.proyecto-card:active {
+  background: var(--mat-sys-surface-container);
+}
+
+.proyecto-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* ---------- Carpetas ---------- */
+
+.carpetas {
+  margin-bottom: 20px;
+}
+
+.carpetas__fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 999px;
+  background: var(--app-surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--app-text);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--app-blue);
+    color: var(--app-blue-strong);
+  }
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.chip--activo {
+  border-color: var(--app-blue);
+  background: var(--app-blue-soft);
+  color: var(--app-blue-strong);
+  font-weight: 500;
+}
+
+.chip__count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+// Separa el acceso a /carpetas de los chips de filtro
+.carpetas__admin {
+  margin-left: 8px;
+  // mat-stroked-button es transparente por default: sin esto dejaba ver
+  // el fondo de la pagina (--app-bg) detras, en vez de verse como un
+  // boton solido.
+  background: var(--app-surface);
+}
+
+
+.menu-titulo {
+  display: block;
+  padding: 8px 16px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+/* ---------- Tarjeta de proyecto ---------- */
+
+.proyecto-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.proyecto-card__menu {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--app-text-subtle);
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--app-text);
+  }
+}
+
+.proyecto-carpeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--app-surface-subtle);
+  font-size: 11px;
+  color: var(--app-text-muted);
+
+  mat-icon {
+    font-size: 13px;
+    width: 13px;
+    height: 13px;
+  }
+}
+
+.proyecto-desc {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+  margin: 0;
+}
+
+.proyecto-meta {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  gap: 6px;
+}
+
+.proyecto-progress {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.proyecto-progress-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+}

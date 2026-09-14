@@ -1,0 +1,64 @@
+:host {
+  display: block;
+  overflow-x: auto;
+}
+
+.archivos-tabla {
+  width: 100%;
+}
+
+.archivo-nombre {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.archivo-icono {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--app-blue);
+}
+
+.col-peso {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text-muted);
+}
+
+.col-acciones {
+  width: 56px;
+  text-align: right;
+}
+
+.archivos-error {
+  color: var(--app-red-strong);
+  background: var(--app-red-soft);
+  padding: 9px 12px;
+  border-radius: 8px;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.archivos-loading,
+.archivos-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--app-text-muted);
+
+  p {
+    margin: 0;
+    font-size: 13px;
+  }
+
+  mat-icon {
+    font-size: 36px;
+    width: 36px;
+    height: 36px;
+    color: var(--app-text-subtle);
+  }
+}

@@ -1,0 +1,60 @@
+@if (errorMessage()) {
+  <p class="archivos-error">{{ errorMessage() }}</p>
+}
+
+@if (loading()) {
+  <div class="archivos-loading">
+    <mat-spinner diameter="32"></mat-spinner>
+    <p>Cargando archivos…</p>
+  </div>
+} @else if (archivos().length === 0) {
+  <div class="archivos-vacio">
+    <mat-icon>folder_off</mat-icon>
+    <p>Todavía no hay archivos adjuntos en las tareas de este proyecto.</p>
+  </div>
+} @else {
+  <table mat-table [dataSource]="archivos()" class="archivos-tabla">
+    <ng-container matColumnDef="fileName">
+      <th mat-header-cell *matHeaderCellDef>Archivo</th>
+      <td mat-cell *matCellDef="let a">
+        <span class="archivo-nombre">
+          <mat-icon class="archivo-icono">description</mat-icon>
+          {{ a.fileName }}
+        </span>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="size">
+      <th mat-header-cell *matHeaderCellDef>Peso</th>
+      <td mat-cell *matCellDef="let a" class="col-peso">{{ formatFileSize(a.fileSizeBytes) }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="task">
+      <th mat-header-cell *matHeaderCellDef>Tarea</th>
+      <td mat-cell *matCellDef="let a">{{ a.taskTitle }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="uploadedBy">
+      <th mat-header-cell *matHeaderCellDef>Subido por</th>
+      <td mat-cell *matCellDef="let a">{{ a.uploadedByFullName }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="acciones">
+      <th mat-header-cell *matHeaderCellDef aria-label="Acciones"></th>
+      <td mat-cell *matCellDef="let a" class="col-acciones">
+        <button
+          mat-icon-button
+          type="button"
+          (click)="onDownload(a)"
+          [attr.aria-label]="'Descargar ' + a.fileName"
+          [attr.title]="'Descargar ' + a.fileName"
+        >
+          <mat-icon>download</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+    <tr mat-row *matRowDef="let row; columns: columnas"></tr>
+  </table>
+}

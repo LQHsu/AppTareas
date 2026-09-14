@@ -1,0 +1,73 @@
+<div class="mis-tareas-page">
+  <header class="mis-tareas-header">
+    <h1>Mis tareas</h1>
+    <button mat-flat-button color="primary" (click)="toggleCreateTaskForm()">
+      <mat-icon>add</mat-icon>
+      Nueva tarea
+    </button>
+  </header>
+
+  @if (showCreateTaskForm()) {
+    <mat-card class="create-card">
+      <form [formGroup]="taskForm" (ngSubmit)="onCreateTask()" class="create-form">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="create-field">
+          <mat-label>Título</mat-label>
+          <input matInput formControlName="title" />
+          @if (taskForm.get('title')?.hasError('required') && taskForm.get('title')?.touched) {
+            <mat-error>El título es obligatorio</mat-error>
+          }
+        </mat-form-field>
+
+        <app-editor-texto
+          class="create-field"
+          formControlName="description"
+          label="Descripción (opcional)"
+          placeholder="Describe en qué consiste la tarea…"
+        />
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="create-field">
+          <mat-label>Asignar a (opcional, puedes elegir varios)</mat-label>
+          <mat-select formControlName="assignedToIds" multiple>
+            @for (candidate of areaCandidates(); track candidate.id) {
+              <mat-option [value]="candidate.id">{{ candidate.fullName }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>Solo gente de tu área. Si eliges varias, se crea una tarea igual para cada una.</mat-hint>
+        </mat-form-field>
+
+        <div class="create-actions">
+          <button mat-button type="button" (click)="toggleCreateTaskForm()">Cancelar</button>
+          <button mat-flat-button color="primary" type="submit" [disabled]="creatingTask()">
+            @if (creatingTask()) {
+              <mat-spinner diameter="18"></mat-spinner>
+            } @else {
+              Crear
+            }
+          </button>
+        </div>
+      </form>
+    </mat-card>
+  }
+
+  @if (errorMessage()) {
+    <p class="mis-tareas-error">{{ errorMessage() }}</p>
+  }
+
+  @if (loading()) {
+    <div class="mis-tareas-loading">
+      <mat-spinner diameter="32"></mat-spinner>
+      <p>Cargando tus tareas…</p>
+    </div>
+  } @else if (tasks().length === 0) {
+    <div class="mis-tareas-empty">
+      <p>No tienes tareas asignadas por ahora.</p>
+    </div>
+  } @else {
+    <app-tareas-tabla
+      [tasks]="tasks()"
+      [showProject]="true"
+      (rowClick)="openTaskDetail($event)"
+      (statusChange)="onStatusChange($event.task, $event.status)"
+    />
+  }
+</div>

@@ -1,0 +1,188 @@
+<div class="proyectos-page">
+  <header class="proyectos-header">
+    <h1>Mis proyectos</h1>
+    <div class="proyectos-header-actions">
+      <button mat-flat-button color="primary" (click)="toggleCreateForm()">
+        <mat-icon>add</mat-icon>
+        Nuevo proyecto
+      </button>
+    </div>
+  </header>
+
+  @if (showCreateForm()) {
+    <mat-card class="create-card">
+      <form [formGroup]="form" (ngSubmit)="onCreate()" class="create-form">
+        <mat-form-field appearance="outline" class="create-field">
+          <mat-label>Nombre del proyecto</mat-label>
+          <input matInput formControlName="name" />
+          @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+            <mat-error>El nombre es obligatorio</mat-error>
+          }
+        </mat-form-field>
+
+        <app-editor-texto
+          class="create-field"
+          formControlName="description"
+          label="Descripción (opcional)"
+          placeholder="Describe de qué trata el proyecto…"
+        />
+
+        @if (carpetaActivaNombre(); as nombre) {
+          <p class="create-hint">
+            <mat-icon inline>folder</mat-icon>
+            Se creará dentro de la carpeta <strong>{{ nombre }}</strong>.
+          </p>
+        }
+
+        <div class="create-actions">
+          <button mat-button type="button" (click)="toggleCreateForm()">Cancelar</button>
+          <button mat-flat-button color="primary" type="submit" [disabled]="creating()">
+            @if (creating()) {
+              <mat-spinner diameter="18"></mat-spinner>
+            } @else {
+              Crear
+            }
+          </button>
+        </div>
+      </form>
+    </mat-card>
+  }
+
+  <!-- CARPETAS -->
+  <section class="carpetas">
+    <div class="carpetas__fila">
+      <button
+        class="chip"
+        [class.chip--activo]="filtroCarpeta() === 'all'"
+        (click)="filtroCarpeta.set('all')"
+      >
+        <mat-icon inline>inbox</mat-icon>
+        Todos
+        <span class="chip__count">{{ projects().length }}</span>
+      </button>
+
+      @for (folder of folders(); track folder.id) {
+        <button
+          class="chip"
+          [class.chip--activo]="filtroCarpeta() === folder.id"
+          (click)="filtroCarpeta.set(folder.id)"
+          [matTooltip]="
+            folder.isOwner
+              ? (folder.sharedWithFullName ? 'Compartida con ' + folder.sharedWithFullName : '')
+              : 'Compartida contigo por ' + folder.ownerFullName
+          "
+        >
+          <mat-icon inline>{{ folder.sharedWithId || !folder.isOwner ? 'folder_shared' : 'folder' }}</mat-icon>
+          {{ folder.name }}
+          <span class="chip__count">{{ folder.projectCount }}</span>
+        </button>
+      }
+
+      @if (sinCarpetaCount() > 0) {
+        <button
+          class="chip"
+          [class.chip--activo]="filtroCarpeta() === 'none'"
+          (click)="filtroCarpeta.set('none')"
+        >
+          Sin carpeta
+          <span class="chip__count">{{ sinCarpetaCount() }}</span>
+        </button>
+      }
+
+      <!-- La administracion de carpetas vive en /carpetas -->
+      <a mat-stroked-button routerLink="/carpetas" class="carpetas__admin">
+        <mat-icon>folder_open</mat-icon>
+        Administrar carpetas
+      </a>
+    </div>
+  </section>
+
+  @if (errorMessage()) {
+    <p class="proyectos-error">{{ errorMessage() }}</p>
+  }
+
+  @if (loading()) {
+    <div class="proyectos-loading">
+      <mat-spinner diameter="32"></mat-spinner>
+      <p>Cargando proyectos…</p>
+    </div>
+  } @else if (projects().length === 0) {
+    <div class="proyectos-empty">
+      <p>Todavía no tienes proyectos. Crea el primero para empezar.</p>
+    </div>
+  } @else if (projectsFiltrados().length === 0) {
+    <div class="proyectos-empty">
+      <p>No hay proyectos en esta carpeta.</p>
+    </div>
+  } @else {
+    <div class="proyectos-grid">
+      @for (project of projectsFiltrados(); track project.id) {
+        <mat-card class="proyecto-card" [routerLink]="['/proyectos', project.id]">
+          <div class="proyecto-card__head">
+            <h3>{{ project.name }}</h3>
+            <!-- stopPropagation en el boton: la tarjeta entera es un
+                 routerLink, sin esto abrir el menu navegaria. -->
+            <button
+              class="proyecto-card__menu"
+              [matMenuTriggerFor]="menuProyecto"
+              (click)="$event.stopPropagation()"
+              aria-label="Mover a carpeta"
+            >
+              <mat-icon inline>more_vert</mat-icon>
+            </button>
+
+            <mat-menu #menuProyecto="matMenu">
+              <span class="menu-titulo">Mover a carpeta</span>
+              @for (folder of carpetasPropias(); track folder.id) {
+                <button
+                  mat-menu-item
+                  [disabled]="project.folderId === folder.id"
+                  (click)="onMoverProyecto(project, folder.id, $event)"
+                >
+                  <mat-icon>folder</mat-icon>
+                  {{ folder.name }}
+                </button>
+              }
+              @if (carpetasPropias().length === 0) {
+                <button mat-menu-item disabled>Aún no tienes carpetas</button>
+              }
+              @if (project.folderId) {
+                <button mat-menu-item (click)="onMoverProyecto(project, null, $event)">
+                  <mat-icon>folder_off</mat-icon>
+                  Quitar de la carpeta
+                </button>
+              }
+            </mat-menu>
+          </div>
+
+          @if (project.folderName) {
+            <span class="proyecto-carpeta">
+              <mat-icon inline>folder</mat-icon>
+              {{ project.folderName }}
+            </span>
+          }
+
+          <!-- Texto plano a proposito: la descripcion puede traer
+               titulos y listas, que en una tarjeta chica romperian el
+               layout. El formato completo se ve en el detalle. -->
+          @if (project.description | textoPlano; as resumen) {
+            <p class="proyecto-desc">{{ resumen }}</p>
+          }
+
+          <div class="proyecto-meta">
+            <span>{{ project.areaNombre }}</span>
+            <span>·</span>
+            <span>{{ project.ownerFullName }}</span>
+          </div>
+
+          <div class="proyecto-progress">
+            <mat-progress-bar mode="determinate" [value]="completionPercent(project)"></mat-progress-bar>
+            <span class="proyecto-progress-label">
+              {{ completionPercent(project) }}% · {{ project.completedTasks }}/{{ project.totalTasks }} tareas
+            </span>
+          </div>
+        </mat-card>
+      }
+    </div>
+  }
+</div>

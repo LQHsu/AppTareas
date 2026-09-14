@@ -1,0 +1,137 @@
+@if (label) {
+  <label class="editor__label">{{ label }}</label>
+}
+
+<div class="editor" [class.editor--enfocado]="enfocado()" [class.editor--disabled]="disabled()">
+  <div class="editor__barra" (mousedown)="onToolbarMouseDown($event)">
+    <select
+      class="editor__select"
+      [value]="bloqueActual()"
+      [disabled]="disabled()"
+      (change)="cambiarBloque($any($event.target).value)"
+      aria-label="Tamaño de texto"
+    >
+      <option value="p">Texto normal</option>
+      <option value="h3">Título</option>
+      <option value="h4">Subtítulo</option>
+    </select>
+
+    <mat-divider vertical class="editor__sep"></mat-divider>
+
+    <button
+      type="button"
+      class="editor__btn"
+      [class.editor__btn--activo]="estados()['bold']"
+      [disabled]="disabled()"
+      (click)="aplicar('bold')"
+      matTooltip="Negrita"
+      aria-label="Negrita"
+    >
+      <mat-icon>format_bold</mat-icon>
+    </button>
+
+    <button
+      type="button"
+      class="editor__btn"
+      [class.editor__btn--activo]="estados()['italic']"
+      [disabled]="disabled()"
+      (click)="aplicar('italic')"
+      matTooltip="Itálica"
+      aria-label="Itálica"
+    >
+      <mat-icon>format_italic</mat-icon>
+    </button>
+
+    <button
+      type="button"
+      class="editor__btn"
+      [class.editor__btn--activo]="estados()['underline']"
+      [disabled]="disabled()"
+      (click)="aplicar('underline')"
+      matTooltip="Subrayado"
+      aria-label="Subrayado"
+    >
+      <mat-icon>format_underlined</mat-icon>
+    </button>
+
+    <mat-divider vertical class="editor__sep"></mat-divider>
+
+    <button
+      type="button"
+      class="editor__btn"
+      [class.editor__btn--activo]="estados()['justifyLeft']"
+      [disabled]="disabled()"
+      (click)="aplicar('justifyLeft')"
+      matTooltip="Alinear a la izquierda"
+      aria-label="Alinear a la izquierda"
+    >
+      <mat-icon>format_align_left</mat-icon>
+    </button>
+
+    <button
+      type="button"
+      class="editor__btn"
+      [class.editor__btn--activo]="estados()['justifyCenter']"
+      [disabled]="disabled()"
+      (click)="aplicar('justifyCenter')"
+      matTooltip="Centrar"
+      aria-label="Centrar"
+    >
+      <mat-icon>format_align_center</mat-icon>
+    </button>
+
+    <button
+      type="button"
+      class="editor__btn"
+      [class.editor__btn--activo]="estados()['justifyRight']"
+      [disabled]="disabled()"
+      (click)="aplicar('justifyRight')"
+      matTooltip="Alinear a la derecha"
+      aria-label="Alinear a la derecha"
+    >
+      <mat-icon>format_align_right</mat-icon>
+    </button>
+
+    <mat-divider vertical class="editor__sep"></mat-divider>
+
+    <button
+      type="button"
+      class="editor__btn"
+      [class.editor__btn--activo]="estados()['insertUnorderedList']"
+      [disabled]="disabled()"
+      (click)="aplicar('insertUnorderedList')"
+      matTooltip="Lista con viñetas"
+      aria-label="Lista con viñetas"
+    >
+      <mat-icon>format_list_bulleted</mat-icon>
+    </button>
+
+    <button
+      type="button"
+      class="editor__btn"
+      [class.editor__btn--activo]="estados()['insertOrderedList']"
+      [disabled]="disabled()"
+      (click)="aplicar('insertOrderedList')"
+      matTooltip="Lista numerada"
+      aria-label="Lista numerada"
+    >
+      <mat-icon>format_list_numbered</mat-icon>
+    </button>
+  </div>
+
+  <div
+    #editor
+    class="editor__contenido"
+    [attr.contenteditable]="!disabled()"
+    [attr.data-placeholder]="placeholder"
+    [class.editor__contenido--vacio]="vacio()"
+    role="textbox"
+    aria-multiline="true"
+    [attr.aria-label]="label || placeholder"
+    (input)="onInput()"
+    (focus)="onFocus()"
+    (blur)="onBlur()"
+    (keyup)="actualizarEstados()"
+    (mouseup)="actualizarEstados()"
+  ></div>
+</div>

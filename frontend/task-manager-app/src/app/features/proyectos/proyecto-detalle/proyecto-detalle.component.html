@@ -1,0 +1,249 @@
+<div class="detalle-page">
+  <a routerLink="/proyectos" class="back-link">
+    <mat-icon>arrow_back</mat-icon>
+    Volver a proyectos
+  </a>
+
+  @if (project(); as p) {
+    @if (editandoProyecto()) {
+      <mat-card class="create-card">
+        <div class="create-form">
+          <div>
+            <label class="edicion__label" for="proyecto-nombre">Nombre del proyecto</label>
+            <input
+              id="proyecto-nombre"
+              class="input-titulo"
+              [(ngModel)]="edicionNombre"
+              placeholder="Nombre del proyecto"
+            />
+          </div>
+
+          <app-editor-texto
+            [(ngModel)]="edicionDescripcion"
+            label="Descripción (opcional)"
+            placeholder="Describe de qué trata el proyecto…"
+          />
+
+          <div class="create-actions">
+            <button mat-button type="button" (click)="cancelarEdicionProyecto()">Cancelar</button>
+            <button
+              mat-flat-button
+              type="button"
+              [disabled]="!edicionNombre.trim() || guardandoProyecto()"
+              (click)="guardarEdicionProyecto()"
+            >
+              @if (guardandoProyecto()) {
+                <mat-spinner diameter="18"></mat-spinner>
+              } @else {
+                Guardar cambios
+              }
+            </button>
+          </div>
+        </div>
+      </mat-card>
+    } @else {
+      <header class="detalle-header">
+        <div>
+          <h1>{{ p.name }}</h1>
+          <p class="detalle-subtitle">{{ p.areaNombre }} · Dueño: {{ p.ownerFullName }}</p>
+        </div>
+        @if (isOwner()) {
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="entrarEdicionProyecto()"
+            aria-label="Editar nombre y descripción del proyecto"
+          >
+            <mat-icon>edit</mat-icon>
+            Editar
+          </button>
+        }
+      </header>
+
+      <!-- innerHTML: la descripcion se escribe con app-editor-texto y se
+           guarda como HTML. Angular sanitiza por default (quita scripts y
+           handlers), asi que no hace falta bypass de seguridad. -->
+      @if (p.description) {
+        <div class="detalle-descripcion contenido-rico" [innerHTML]="p.description"></div>
+      }
+    }
+  }
+
+  @if (errorMessage()) {
+    <p class="detalle-error">{{ errorMessage() }}</p>
+  }
+
+  <mat-tab-group>
+    <mat-tab label="Tareas">
+      <div class="tab-content">
+        <div class="tab-actions">
+          <button mat-flat-button color="primary" (click)="toggleCreateTaskForm()">
+            <mat-icon>add</mat-icon>
+            Nueva tarea
+          </button>
+        </div>
+
+        @if (showCreateTaskForm()) {
+          <mat-card class="create-card">
+            <form [formGroup]="taskForm" (ngSubmit)="onCreateTask()" class="create-form">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="create-field">
+                <mat-label>Título</mat-label>
+                <input matInput formControlName="title" />
+                @if (taskForm.get('title')?.hasError('required') && taskForm.get('title')?.touched) {
+                  <mat-error>El título es obligatorio</mat-error>
+                }
+              </mat-form-field>
+
+              <app-editor-texto
+                class="create-field"
+                formControlName="description"
+                label="Descripción (opcional)"
+                placeholder="Describe en qué consiste la tarea…"
+              />
+
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="create-field">
+                <mat-label>Asignar a (opcional, puedes elegir varios)</mat-label>
+                <mat-select formControlName="assignedToIds" multiple>
+                  @for (member of members(); track member.userId) {
+                    <mat-option [value]="member.userId">{{ member.fullName }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>Si eliges más de una persona, se crea una tarea igual para cada una.</mat-hint>
+              </mat-form-field>
+
+              <div class="create-actions">
+                <button mat-button type="button" (click)="toggleCreateTaskForm()">Cancelar</button>
+                <button mat-flat-button color="primary" type="submit" [disabled]="creatingTask()">
+                  @if (creatingTask()) {
+                    <mat-spinner diameter="18"></mat-spinner>
+                  } @else {
+                    Crear
+                  }
+                </button>
+              </div>
+            </form>
+          </mat-card>
+        }
+
+        @if (loadingTasks()) {
+          <div class="detalle-loading">
+            <mat-spinner diameter="32"></mat-spinner>
+            <p>Cargando tareas…</p>
+          </div>
+        } @else if (tasks().length === 0) {
+          <div class="detalle-empty">
+            <p>Este proyecto todavía no tiene tareas.</p>
+          </div>
+        } @else {
+          <app-tareas-tabla
+            [tasks]="tasks()"
+            (rowClick)="openTaskDetail($event)"
+            (statusChange)="onStatusChange($event.task, $event.status)"
+          />
+        }
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Estadísticas">
+      <div class="tab-content">
+        @if (loadingTasks()) {
+          <div class="detalle-loading">
+            <mat-spinner diameter="32"></mat-spinner>
+            <p>Cargando estadísticas…</p>
+          </div>
+        } @else {
+          <app-proyecto-estadisticas [tasks]="tasks()" [members]="members()" />
+        }
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Archivos">
+      <!-- matTabContent: carga diferida. Sin esto MatTab renderiza el
+           contenido de todas las pestañas de entrada, y este componente
+           dispara un GET al inicializarse. -->
+      <ng-template matTabContent>
+        <div class="tab-content">
+          <app-proyecto-archivos [projectId]="projectId" />
+        </div>
+      </ng-template>
+    </mat-tab>
+
+    <mat-tab label="Miembros">
+      <div class="tab-content">
+        @if (isOwner()) {
+          <div class="tab-actions">
+            <button mat-flat-button color="primary" (click)="toggleInviteForm()">
+              <mat-icon>person_add</mat-icon>
+              Invitar
+            </button>
+          </div>
+        }
+
+        @if (showInviteForm()) {
+          <mat-card class="create-card">
+            <div class="invite-row">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="invite-select">
+                <mat-label>Selecciona un usuario de tu área</mat-label>
+                <mat-select
+                  [value]="selectedInviteeId()"
+                  (selectionChange)="selectedInviteeId.set($event.value)"
+                >
+                  @for (candidate of inviteCandidates(); track candidate.id) {
+                    <mat-option [value]="candidate.id">
+                      {{ candidate.fullName }} ({{ candidate.email }})
+                    </mat-option>
+                  }
+                  @if (inviteCandidates().length === 0) {
+                    <mat-option disabled>No hay más usuarios disponibles en esta área</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <button
+                mat-flat-button
+                color="primary"
+                [disabled]="!selectedInviteeId() || inviting()"
+                (click)="onInvite()"
+              >
+                @if (inviting()) {
+                  <mat-spinner diameter="18"></mat-spinner>
+                } @else {
+                  Agregar
+                }
+              </button>
+            </div>
+          </mat-card>
+        }
+
+        @if (loadingMembers()) {
+          <div class="detalle-loading">
+            <mat-spinner diameter="32"></mat-spinner>
+            <p>Cargando miembros…</p>
+          </div>
+        } @else {
+          <div class="members-list">
+            @for (member of members(); track member.userId) {
+              <mat-card class="member-card">
+                <div class="member-info">
+                  <span class="member-name">
+                    {{ member.fullName }}
+                    @if (member.isOwner) {
+                      <span class="member-owner-badge">Dueño</span>
+                    }
+                  </span>
+                  <span class="member-email">{{ member.email }}</span>
+                </div>
+
+                @if (isOwner() && !member.isOwner) {
+                  <button mat-icon-button (click)="onRemoveMember(member)" aria-label="Quitar miembro">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                }
+              </mat-card>
+            }
+          </div>
+        }
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

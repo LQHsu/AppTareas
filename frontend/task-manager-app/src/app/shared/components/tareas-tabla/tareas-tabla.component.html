@@ -1,0 +1,12 @@
+<div class="tareas-tabla-buscador">
+  <div class="tareas-tabla-buscador__caja">
+    <mat-icon class="tareas-tabla-buscador__icono" inline>search</mat-icon>
+    <input
+      type="search"
+      class="tareas-tabla-buscador__input"
+      placeholder="Buscar por tarea, proyecto, asignado o creador…"
+      (input)="onBuscar($event)"
+    />
+  </div>
+</div>
+<div #contenedor class="tareas-tabla-tabulator"></div>

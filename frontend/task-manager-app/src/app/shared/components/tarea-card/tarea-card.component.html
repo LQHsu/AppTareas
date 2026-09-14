@@ -1,0 +1,389 @@
+<article class="tarea" [class.tarea--subtask]="isSubtask">
+  <!-- ENCABEZADO -->
+  <header class="tarea__head">
+    <div class="tarea__title-row">
+      @if (editando()) {
+        <input
+          class="input-titulo"
+          [(ngModel)]="edicionTitulo"
+          placeholder="Título de la tarea"
+          aria-label="Título de la tarea"
+        />
+      } @else {
+        <h3 class="tarea__title">{{ task.title }}</h3>
+        <span class="badge badge--{{ statusTone(task.status) }}">
+          {{ statusLabels[task.status] }}
+        </span>
+        <button
+          mat-icon-button
+          type="button"
+          class="btn-editar"
+          (click)="entrarEdicion()"
+          matTooltip="Editar título y descripción"
+          aria-label="Editar título y descripción"
+        >
+          <mat-icon>edit</mat-icon>
+        </button>
+      }
+    </div>
+
+    <div class="tarea__meta">
+      @if (showProject) {
+        <span class="meta-item">
+          <mat-icon inline>folder_open</mat-icon>
+          {{ task.projectName ?? 'Sin proyecto (tarea suelta)' }}
+        </span>
+      }
+      <span class="meta-item">
+        <mat-icon inline>person_outline</mat-icon>
+        Creada por {{ task.createdByFullName }}
+      </span>
+      <span class="meta-item">
+        <mat-icon inline>schedule</mat-icon>
+        {{ task.createdAt | date: "d 'de' MMMM y, HH:mm" }}
+      </span>
+    </div>
+  </header>
+
+  <!-- DESCRIPCION -->
+  <section class="bloque">
+    <h4 class="bloque__titulo">Descripción</h4>
+
+    @if (editando()) {
+      <app-editor-texto
+        [(ngModel)]="edicionDescripcion"
+        placeholder="Describe en qué consiste la tarea…"
+      />
+      <div class="edicion__acciones">
+        <button mat-button type="button" (click)="cancelarEdicion()">Cancelar</button>
+        <button
+          mat-flat-button
+          type="button"
+          [disabled]="!edicionTitulo.trim()"
+          (click)="guardarEdicion()"
+        >
+          Guardar cambios
+        </button>
+      </div>
+    } @else if (task.description) {
+      <!-- innerHTML: la descripcion se captura con app-editor-texto y se
+           guarda como HTML. Angular sanitiza por default. -->
+      <div class="tarea__desc contenido-rico" [innerHTML]="task.description"></div>
+    } @else {
+      <p class="vacio">Esta tarea no tiene descripción.</p>
+    }
+  </section>
+
+  <!-- ASIGNACION Y ESTADO -->
+  <section class="bloque">
+    <h4 class="bloque__titulo">Asignación y estado</h4>
+    <div class="campos">
+      @if (members) {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo">
+          <mat-label>Persona asignada</mat-label>
+          <mat-select
+            [value]="task.assignedToId"
+            (selectionChange)="assigneeChange.emit($event.value)"
+          >
+            <mat-option [value]="null">Sin asignar</mat-option>
+            @for (member of members; track member.userId) {
+              <mat-option [value]="member.userId">{{ member.fullName }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      } @else {
+        <!-- Mismo mat-form-field que el select de al lado (en vez de un
+             div a medida): asi el alto, borde y densidad quedan
+             identicos sin tener que ajustar CSS a mano para que
+             coincidan (eso era lo que se veia amontonado). -->
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo">
+          <mat-label>Persona asignada</mat-label>
+          <input matInput [value]="task.assignedToFullName ?? 'Sin asignar'" disabled />
+        </mat-form-field>
+      }
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo">
+        <mat-label>Estado de la tarea</mat-label>
+        <mat-select
+          [value]="task.status"
+          [disabled]="!puedeEditarEstado"
+          [matTooltip]="
+            puedeEditarEstado
+              ? ''
+              : 'Solo quien creó la tarea o la tiene asignada puede cambiar su estado'
+          "
+          (selectionChange)="statusChange.emit($event.value)"
+        >
+          <!-- Creada/Asignada/Leida son automaticas y Volver a
+               revisar/Terminada/Cancelada las decide quien creo la
+               tarea: si sos el asignado, se ven pero deshabilitadas
+               (para que quede claro por que no se pueden elegir, en vez
+               de simplemente no aparecer). -->
+          @for (status of statusOptions; track status) {
+            <mat-option [value]="status" [disabled]="!puedeCambiarA(status)">{{ statusLabels[status] }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </section>
+
+  <!-- FECHAS DE SEGUIMIENTO -->
+  @if (task.fechaAsignacion || task.fechaAtencion || task.fechaTerminacion) {
+    <section class="bloque">
+      <h4 class="bloque__titulo">Fechas de seguimiento</h4>
+      <ul class="fechas">
+        @if (task.fechaAsignacion) {
+          <li class="fecha">
+            <mat-icon class="fecha__icono fecha__icono--info">person_add</mat-icon>
+            <span class="fecha__label">Asignada</span>
+            <span class="fecha__valor">{{ task.fechaAsignacion | date: 'd MMM y, HH:mm' }}</span>
+          </li>
+        }
+        @if (task.fechaAtencion) {
+          <li class="fecha">
+            <mat-icon class="fecha__icono fecha__icono--info">visibility</mat-icon>
+            <span class="fecha__label">En atención</span>
+            <span class="fecha__valor">{{ task.fechaAtencion | date: 'd MMM y, HH:mm' }}</span>
+          </li>
+        }
+        @if (task.fechaTerminacion) {
+          <li class="fecha">
+            <mat-icon class="fecha__icono fecha__icono--ok">check_circle</mat-icon>
+            <span class="fecha__label">Terminada</span>
+            <span class="fecha__valor">{{ task.fechaTerminacion | date: 'd MMM y, HH:mm' }}</span>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  <!-- SUBTAREAS -->
+  @if (!isSubtask && (task.subtasks.length > 0 || members)) {
+    <section class="bloque">
+      <h4 class="bloque__titulo">
+        Subtareas
+        @if (task.subtasks.length > 0) {
+          <span class="contador">{{ task.subtasks.length }}</span>
+        }
+      </h4>
+
+      @if (task.subtasks.length > 0) {
+        <div class="subtareas">
+          @for (sub of task.subtasks; track sub.id) {
+            <app-tarea-card
+              [task]="sub"
+              [members]="members"
+              [isSubtask]="true"
+              [isProjectOwner]="isProjectOwner"
+              (assigneeChange)="subtaskAssigneeChange.emit({ subtask: sub, assignedToId: $event })"
+              (statusChange)="subtaskStatusChange.emit({ subtask: sub, status: $event })"
+              (detailsChange)="
+                subtaskDetailsChange.emit({
+                  subtask: sub,
+                  title: $event.title,
+                  description: $event.description
+                })
+              "
+            />
+          }
+        </div>
+      } @else {
+        <p class="vacio">Esta tarea no tiene subtareas.</p>
+      }
+
+      @if (members) {
+        @if (showAddSubtask) {
+          <div class="panel-form">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo campo--full">
+              <mat-label>Título de la subtarea</mat-label>
+              <input matInput [(ngModel)]="newSubtaskTitle" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo campo--full">
+              <mat-label>Persona asignada (opcional)</mat-label>
+              <mat-select [(ngModel)]="newSubtaskAssignedToId">
+                <mat-option [value]="null">Sin asignar</mat-option>
+                @for (member of members; track member.userId) {
+                  <mat-option [value]="member.userId">{{ member.fullName }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <div class="panel-form__acciones">
+              <button mat-button type="button" (click)="toggleAddSubtask()">Cancelar</button>
+              <button
+                mat-flat-button
+                type="button"
+                [disabled]="!newSubtaskTitle.trim()"
+                (click)="onCreateSubtask()"
+              >
+                Crear subtarea
+              </button>
+            </div>
+          </div>
+        } @else {
+          <button mat-stroked-button type="button" class="accion-bloque" (click)="toggleAddSubtask()">
+            <mat-icon>add</mat-icon>
+            Agregar subtarea
+          </button>
+        }
+      }
+    </section>
+  }
+
+  <!-- ARCHIVOS ADJUNTOS -->
+  <section class="bloque">
+    <button
+      type="button"
+      class="bloque__toggle"
+      [attr.aria-expanded]="showAttachments()"
+      (click)="toggleAttachments()"
+    >
+      <mat-icon class="bloque__toggle-icono">attach_file</mat-icon>
+      <span class="bloque__titulo bloque__titulo--inline">Archivos adjuntos</span>
+      @if (attachments().length > 0) {
+        <span class="contador">{{ attachments().length }}</span>
+      }
+      <mat-icon class="bloque__chevron">
+        {{ showAttachments() ? 'expand_less' : 'expand_more' }}
+      </mat-icon>
+    </button>
+
+    @if (showAttachments()) {
+      <div class="bloque__cuerpo">
+        @if (attachmentError()) {
+          <p class="mensaje mensaje--error">{{ attachmentError() }}</p>
+        }
+
+        @if (loadingAttachments()) {
+          <p class="vacio">Cargando archivos adjuntos…</p>
+        } @else {
+          @if (attachments().length > 0) {
+            <ul class="lista-archivos">
+              @for (att of attachments(); track att.id) {
+                <li class="archivo">
+                  <mat-icon class="archivo__icono">description</mat-icon>
+                  <button
+                    type="button"
+                    class="archivo__nombre"
+                    (click)="onDownloadAttachment(att)"
+                    [attr.title]="'Descargar ' + att.fileName"
+                  >
+                    {{ att.fileName }}
+                  </button>
+                  <span class="archivo__meta">
+                    {{ formatFileSize(att.fileSizeBytes) }} · Subido por {{ att.uploadedByFullName }}
+                  </span>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    class="boton-eliminar"
+                    (click)="onDeleteAttachment(att)"
+                    aria-label="Eliminar archivo adjunto"
+                  >
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="vacio">Todavía no hay archivos adjuntos en esta tarea.</p>
+          }
+
+          <input #fileInput type="file" hidden (change)="onFileSelected($event)" />
+          <button
+            mat-stroked-button
+            type="button"
+            class="accion-bloque"
+            [disabled]="uploadingAttachment()"
+            (click)="fileInput.click()"
+          >
+            @if (uploadingAttachment()) {
+              <mat-spinner diameter="16"></mat-spinner>
+            } @else {
+              <mat-icon>upload_file</mat-icon>
+            }
+            {{ uploadingAttachment() ? 'Subiendo archivo…' : 'Subir un archivo' }}
+          </button>
+          <p class="ayuda">Máximo 25 MB. PDF, Word, Excel, PowerPoint, imágenes, TXT o ZIP.</p>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- COMENTARIOS -->
+  <section class="bloque">
+    <button
+      type="button"
+      class="bloque__toggle"
+      [attr.aria-expanded]="showComments()"
+      (click)="toggleComments()"
+    >
+      <mat-icon class="bloque__toggle-icono">chat_bubble_outline</mat-icon>
+      <span class="bloque__titulo bloque__titulo--inline">Comentarios</span>
+      @if (comments().length > 0) {
+        <span class="contador">{{ comments().length }}</span>
+      }
+      <mat-icon class="bloque__chevron">
+        {{ showComments() ? 'expand_less' : 'expand_more' }}
+      </mat-icon>
+    </button>
+
+    @if (showComments()) {
+      <div class="bloque__cuerpo">
+        @if (commentError()) {
+          <p class="mensaje mensaje--error">{{ commentError() }}</p>
+        }
+
+        @if (loadingComments()) {
+          <p class="vacio">Cargando comentarios…</p>
+        } @else {
+          @if (comments().length > 0) {
+            <ul class="lista-comentarios">
+              @for (c of comments(); track c.id) {
+                <li class="comentario">
+                  <div class="comentario__head">
+                    <span class="comentario__autor">{{ c.userFullName }}</span>
+                    <span class="comentario__fecha">{{ c.createdAt | date: 'd MMM y, HH:mm' }}</span>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      class="boton-eliminar"
+                      (click)="onDeleteComment(c)"
+                      aria-label="Eliminar comentario"
+                    >
+                      <mat-icon>delete_outline</mat-icon>
+                    </button>
+                  </div>
+                  <p class="comentario__texto">{{ c.content }}</p>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="vacio">Todavía no hay comentarios en esta tarea.</p>
+          }
+
+          <div class="panel-form">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo campo--full">
+              <mat-label>Escribe un comentario</mat-label>
+              <textarea matInput rows="3" [(ngModel)]="newCommentText"></textarea>
+            </mat-form-field>
+            <div class="panel-form__acciones">
+              <button
+                mat-flat-button
+                type="button"
+                [disabled]="!newCommentText.trim() || postingComment()"
+                (click)="onPostComment()"
+              >
+                @if (postingComment()) {
+                  <mat-spinner diameter="16"></mat-spinner>
+                }
+                {{ postingComment() ? 'Publicando…' : 'Publicar comentario' }}
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </section>
+</article>

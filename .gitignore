@@ -1,0 +1,25 @@
+# --- Backend .NET ---
+backend/**/bin/
+backend/**/obj/
+backend/**/appsettings.Local.json
+backend/**/App_Data/
+
+# --- Frontend Angular (ver tambien frontend/task-manager-app/.gitignore,
+#     que sigue aplicando ademas de este) ---
+frontend/**/node_modules/
+frontend/**/dist/
+frontend/**/.angular/
+
+# --- Docker / Keycloak ---
+# (docker/keycloak/.gitignore, scoped a esa carpeta, cubre el detalle:
+#  .env, jars de providers, exports de realm sin limpiar)
+
+# --- Editores / SO ---
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db

@@ -1,0 +1,115 @@
+<mat-sidenav-container class="shell-container">
+  <mat-sidenav mode="side" opened class="shell-nav" [class.shell-nav--expanded]="expanded()">
+    <div class="shell-toggle">
+      <button
+        mat-icon-button
+        (click)="toggleExpanded()"
+        [attr.aria-label]="expanded() ? 'Colapsar menú' : 'Expandir menú'"
+      >
+        <mat-icon>{{ expanded() ? 'chevron_left' : 'menu' }}</mat-icon>
+      </button>
+    </div>
+
+    <nav class="shell-links">
+      <a
+        routerLink="/proyectos"
+        routerLinkActive="shell-link--active"
+        class="shell-link"
+        matTooltip="Proyectos"
+        [matTooltipDisabled]="expanded()"
+        matTooltipPosition="right"
+      >
+        <mat-icon>space_dashboard</mat-icon>
+        @if (expanded()) {
+          <span>Proyectos</span>
+        }
+      </a>
+
+      <a
+        routerLink="/carpetas"
+        routerLinkActive="shell-link--active"
+        class="shell-link"
+        matTooltip="Carpetas"
+        [matTooltipDisabled]="expanded()"
+        matTooltipPosition="right"
+      >
+        <mat-icon>folder</mat-icon>
+        @if (expanded()) {
+          <span>Carpetas</span>
+        }
+      </a>
+
+      <a
+        routerLink="/mis-tareas"
+        routerLinkActive="shell-link--active"
+        class="shell-link"
+        matTooltip="Mis tareas"
+        [matTooltipDisabled]="expanded()"
+        matTooltipPosition="right"
+      >
+        <mat-icon>assignment_ind</mat-icon>
+        @if (expanded()) {
+          <span>Mis tareas</span>
+        }
+      </a>
+
+      @if (userService.currentUser()?.isSuperAdmin) {
+        <a
+          routerLink="/admin"
+          routerLinkActive="shell-link--active"
+          class="shell-link"
+          matTooltip="Panel de administración"
+          [matTooltipDisabled]="expanded()"
+          matTooltipPosition="right"
+        >
+          <mat-icon>admin_panel_settings</mat-icon>
+          @if (expanded()) {
+            <span>Admin</span>
+          }
+        </a>
+      }
+    </nav>
+
+    @if (expanded()) {
+      <div class="shell-panel">
+        <section class="shell-section">
+          <h3>Proyectos</h3>
+          @if (loadingProjects()) {
+            <p class="shell-empty">Cargando…</p>
+          } @else if (projects().length === 0) {
+            <p class="shell-empty">No tienes proyectos.</p>
+          } @else {
+            <ul class="shell-list">
+              @for (p of projects(); track p.id) {
+                <li>
+                  <a [routerLink]="['/proyectos', p.id]" class="shell-item">{{ p.name }}</a>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+
+        <section class="shell-section">
+          <h3>Tareas recientes</h3>
+          @if (loadingTasks()) {
+            <p class="shell-empty">Cargando…</p>
+          } @else if (recentTasks().length === 0) {
+            <p class="shell-empty">No tienes tareas.</p>
+          } @else {
+            <ul class="shell-list">
+              @for (t of recentTasks(); track t.id) {
+                <li>
+                  <a class="shell-item" (click)="onRecentTaskClick(t)">{{ t.title }}</a>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+      </div>
+    }
+  </mat-sidenav>
+
+  <mat-sidenav-content class="shell-content">
+    <router-outlet></router-outlet>
+  </mat-sidenav-content>
+</mat-sidenav-container>

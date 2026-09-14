@@ -1,0 +1,123 @@
+<div class="admin-page">
+  <header class="admin-header">
+    <h1>Panel de administración</h1>
+  </header>
+
+  @if (errorMessage()) {
+    <p class="admin-error">{{ errorMessage() }}</p>
+  }
+
+  <mat-tab-group>
+    <mat-tab label="Usuarios">
+      <div class="tab-content">
+        @if (loadingUsers()) {
+          <div class="admin-loading">
+            <mat-spinner diameter="32"></mat-spinner>
+            <p>Cargando usuarios…</p>
+          </div>
+        } @else {
+          <table mat-table [dataSource]="users()" class="admin-tabla">
+            <ng-container matColumnDef="fullName">
+              <th mat-header-cell *matHeaderCellDef>Nombre</th>
+              <td mat-cell *matCellDef="let user">
+                {{ user.fullName }}
+                @if (isSelf(user)) {
+                  <span class="self-badge">Tú</span>
+                }
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="email">
+              <th mat-header-cell *matHeaderCellDef>Email</th>
+              <td mat-cell *matCellDef="let user">{{ user.email }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="area">
+              <th mat-header-cell *matHeaderCellDef>Área</th>
+              <td mat-cell *matCellDef="let user">{{ user.areaNombre }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="superAdmin">
+              <th mat-header-cell *matHeaderCellDef>Super admin</th>
+              <td mat-cell *matCellDef="let user">
+                <mat-slide-toggle
+                  [checked]="user.isSuperAdmin"
+                  [disabled]="updatingUserId() === user.id"
+                  (change)="onToggleSuperAdmin(user, $event)"
+                ></mat-slide-toggle>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="banned">
+              <th mat-header-cell *matHeaderCellDef>Bloqueado</th>
+              <td mat-cell *matCellDef="let user">
+                @if (isSelf(user)) {
+                  <span class="not-applicable">—</span>
+                } @else {
+                  <mat-slide-toggle
+                    [checked]="user.isBanned"
+                    [disabled]="updatingUserId() === user.id"
+                    (change)="onToggleBanned(user, $event)"
+                  ></mat-slide-toggle>
+                }
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="userColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: userColumns"></tr>
+          </table>
+        }
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Proyectos">
+      <div class="tab-content">
+        @if (loadingProjects()) {
+          <div class="admin-loading">
+            <mat-spinner diameter="32"></mat-spinner>
+            <p>Cargando proyectos…</p>
+          </div>
+        } @else {
+          <table mat-table [dataSource]="projects()" class="admin-tabla">
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef>Proyecto</th>
+              <td mat-cell *matCellDef="let project">{{ project.name }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="area">
+              <th mat-header-cell *matHeaderCellDef>Área</th>
+              <td mat-cell *matCellDef="let project">{{ project.areaNombre }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="owner">
+              <th mat-header-cell *matHeaderCellDef>Dueño</th>
+              <td mat-cell *matCellDef="let project">{{ project.ownerFullName }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="members">
+              <th mat-header-cell *matHeaderCellDef>Miembros</th>
+              <td mat-cell *matCellDef="let project">{{ project.memberCount }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="tasks">
+              <th mat-header-cell *matHeaderCellDef>Tareas</th>
+              <td mat-cell *matCellDef="let project">
+                {{ project.completedTasks }} / {{ project.totalTasks }}
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="createdAt">
+              <th mat-header-cell *matHeaderCellDef>Creado</th>
+              <td mat-cell *matCellDef="let project">
+                {{ project.createdAt | date: 'd MMM y' }}
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="projectColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: projectColumns"></tr>
+          </table>
+        }
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

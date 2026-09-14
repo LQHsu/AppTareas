@@ -1,0 +1,206 @@
+@use '@angular/material' as mat;
+
+:host {
+  // Mismo criterio que en tarea-card: el mat-form-field outline por
+  // default queda desproporcionado frente al texto del resto de la vista.
+  @include mat.form-field-density(-3);
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stats__filtro {
+  display: flex;
+}
+
+.filtro-campo {
+  width: 100%;
+  max-width: 320px;
+}
+
+/* ---------- Tarjetas ---------- */
+
+.stats__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--app-border);
+  box-shadow: none;
+}
+
+.stat-card--destacada {
+  border-color: var(--app-blue);
+  background: var(--app-blue-soft);
+}
+
+.stat-card__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+.stat-card__valor {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--app-text);
+}
+
+.stat-card__valor--ok {
+  color: var(--app-green);
+}
+
+.stat-card--destacada .stat-card__valor {
+  color: var(--app-blue-strong);
+}
+
+.stat-card__barra {
+  margin: 6px 0 2px;
+  border-radius: 999px;
+}
+
+.stat-card__nota {
+  font-size: 12px;
+  color: var(--app-text-muted);
+}
+
+/* ---------- Grafico ---------- */
+
+.grafico {
+  padding: 18px;
+  border: 1px solid var(--app-border);
+  box-shadow: none;
+}
+
+.grafico__titulo {
+  margin: 0 0 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+.grafico__cuerpo {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.donut {
+  flex: none;
+  width: 190px;
+  height: 190px;
+}
+
+.donut__pista {
+  stroke: var(--app-surface-subtle);
+}
+
+.donut__num {
+  font-size: 7px;
+  font-weight: 600;
+  fill: var(--app-text);
+}
+
+.donut__lbl {
+  font-size: 2.8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--app-text-subtle);
+}
+
+/* ---------- Leyenda ---------- */
+
+.leyenda {
+  flex: 1;
+  min-width: 220px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.leyenda__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+
+  &:hover {
+    background: var(--app-surface-subtle);
+  }
+}
+
+.leyenda__punto {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.leyenda__label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--app-text);
+}
+
+.leyenda__count {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.leyenda__pct {
+  width: 42px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--app-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.vacio {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--app-text-subtle);
+}
+
+/* ---------- Movil ---------- */
+
+@media (max-width: 600px) {
+  .filtro-campo {
+    max-width: none;
+  }
+
+  .grafico__cuerpo {
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .donut {
+    width: 160px;
+    height: 160px;
+  }
+
+  .leyenda {
+    width: 100%;
+    min-width: 0;
+  }
+}

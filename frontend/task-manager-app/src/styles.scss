@@ -1,0 +1,217 @@
+// Include theming for Angular Material with `mat.theme()`.
+// This Sass mixin will define CSS variables that are used for styling Angular Material
+// components according to the Material 3 design spec.
+// Learn more about theming and how to use it for your application's
+// custom components at https://material.angular.dev/guide/theming
+@use '@angular/material' as mat;
+
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+
+  // --- Paleta de la app ---
+  // Rediseño en curso (v2): el azul de acento cambio de un azul brillante
+  // (#3985EC) a este teal oscuro. "-soft" ahora es el mismo cyan palido
+  // que se usa como fondo general de la app (--app-bg): las cajas/modales
+  // CON informacion se quedan en blanco (--app-surface), pero cualquier
+  // fondo "vacio" (el shell, contenedores sin contenido propio, chips)
+  // usa este tono. Verde/rojo tambien se actualizaron (ver mas abajo).
+  --app-blue: #2e5966;
+  --app-blue-strong: #274c57;
+  --app-blue-soft: #f2f6ff;
+
+  // Fondo de "recuadros sin informacion" (el shell, el body detras de
+  // las tarjetas): las tarjetas/modales que SI muestran informacion se
+  // quedan blancas (--app-surface). Es el mismo valor que --app-blue-soft
+  // a proposito -- son el mismo concepto, dos nombres para dejar claro
+  // el uso en el sitio donde se usa cada uno.
+  --app-bg: var(--app-blue-soft);
+
+  // Para iconos o botones que necesiten contrastar contra el nuevo fondo
+  // claro (--app-bg) sin recurrir al azul de acento — p.ej. iconos de
+  // navegacion, botones secundarios.
+  --app-contrast: #576d73;
+
+  // v2 (2026-09-11): mismo verde/rojo que los badges de Terminada/
+  // Cancelada (--estado-terminada/--estado-cancelada) — un solo color de
+  // "exito"/"error" en toda la app, no uno para tareas y otro para el
+  // resto de la UI.
+  --app-green: #429867;
+  --app-green-strong: #388158;
+  --app-green-soft: #e6f2eb;
+
+  --app-red: #e02130;
+  --app-red-strong: #be1c29;
+  --app-red-soft: #fbe2e4;
+
+  // Colores del badge de estado de tarea (TaskItemStatus): uno distinto
+  // por estado, no el azul/verde/rojo de arriba — son 8 estados y
+  // agruparlos en 3 tonos los volvia dificil de distinguir a simple
+  // vista. El badge se pinta con borde + texto en este color y fondo en
+  // la variante "-soft" (mezcla con blanco).
+  //
+  // v2 (2026-09-11): "En atencion" hereda el morado que tenia
+  // "Terminada" antes de este cambio; Terminada/Volver a
+  // revisar/Cancelada se repintaron con colores mas intuitivos
+  // (verde=hecho, ambar=revisar, rojo=cancelado). Cancelada deja de ser
+  // gris neutro (asi se penso originalmente, para no darle protagonismo)
+  // y pasa a tener su propio color — decision explicita del usuario al
+  // pedir este cambio.
+  --estado-creada: #5a4e74;
+  --estado-creada-soft: #eae8ed;
+
+  --estado-asignada: #4a492c;
+  --estado-asignada-soft: #e7e7e4;
+
+  --estado-leida: #4ba600;
+  --estado-leida-soft: #e8f3de;
+
+  --estado-en-atencion: #6d45c9;
+  --estado-en-atencion-soft: #ece7f8;
+
+  --estado-atendida: #2f9ac9;
+  --estado-atendida-soft: #e4f2f8;
+
+  --estado-volver-a-revisar: #d16b00;
+  --estado-volver-a-revisar-soft: #f9ecde;
+
+  --estado-terminada: #429867;
+  --estado-terminada-soft: #e6f2eb;
+
+  --estado-cancelada: #e02130;
+  --estado-cancelada-soft: #fbe2e4;
+
+  --app-surface: #ffffff;
+  // v2: mezcla clara de --app-contrast (no de --app-blue, para que se
+  // distinga de --app-bg — mismo fondo "no blanco" pero un tono mas
+  // neutro/gris que el azulado, ya que este se usa DENTRO de tarjetas
+  // blancas -campos de solo lectura, franjas de tabla-, no como fondo
+  // de pagina).
+  --app-surface-subtle: #f2f3f4;
+  --app-border: #e4e7ec;
+  --app-border-strong: #d3d8e0;
+
+  --app-text: #1a1f28;
+  --app-text-muted: #5b6472;
+  --app-text-subtle: #858e9c;
+
+  // Se remapean las variables de sistema de Material para que los
+  // componentes de la libreria (botones, toggles, spinners, errores)
+  // usen la paleta de arriba sin tener que estilizarlos uno por uno.
+  --mat-sys-primary: var(--app-blue);
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: var(--app-blue-soft);
+  --mat-sys-on-primary-container: var(--app-blue-strong);
+
+  --mat-sys-error: var(--app-red);
+  --mat-sys-on-error: #ffffff;
+  --mat-sys-error-container: var(--app-red-soft);
+  --mat-sys-on-error-container: var(--app-red-strong);
+
+  --mat-sys-surface: var(--app-surface);
+
+  // mat-card (appearance="elevated", el default que usan Proyectos/Mis
+  // tareas/Carpetas/etc.) no usa --mat-sys-surface para su fondo: usa
+  // "surface-container-low", un tono que Material genera mezclando el
+  // primario, asi que con el nuevo azul mas oscuro las tarjetas se veian
+  // con un tinte en vez de blanco puro. Se fuerza blanco aca (una sola
+  // vez, global) en vez de tocar cada .component.scss. El tinte no se
+  // pierde: sigue disponible en --mat-sys-surface-container-low para
+  // usarlo como estado hover/presionado (ver .proyecto-card:hover, etc.)
+  --mat-card-elevated-container-color: var(--app-surface);
+}
+
+// Contenido generado por app-editor-texto cuando se muestra fuera del
+// editor (via [innerHTML]). Va global y no en un componente porque el
+// HTML se inyecta dinamicamente: los estilos con scope de Angular no
+// alcanzan a esos nodos. Debe coincidir con .editor__contenido.
+.contenido-rico {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--app-text);
+
+  > :first-child {
+    margin-top: 0;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  p {
+    margin: 0 0 8px;
+  }
+
+  h3 {
+    margin: 12px 0 6px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  h4 {
+    margin: 10px 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  ul,
+  ol {
+    margin: 0 0 8px;
+    padding-left: 22px;
+  }
+
+  li {
+    margin-bottom: 2px;
+  }
+}
+
+// Por default el contenedor del dialog en M3 usa un gris tintado
+// (surface-container-high). Se fuerza blanco para que el modal no se
+// vea como una caja gris con el contenido encima.
+.cdk-overlay-pane.tarea-detalle-panel .mat-mdc-dialog-surface {
+  background: var(--app-surface);
+  border-radius: 14px;
+}
+
+// El dialog de detalle de tarea ocupa toda la pantalla en moviles: el
+// ancho fijo lo pone MatDialog como estilo inline en el overlay, por eso
+// hace falta !important para ganarle desde aca.
+@media (max-width: 640px) {
+  .cdk-overlay-pane.tarea-detalle-panel {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100%;
+  }
+
+  .cdk-overlay-pane.tarea-detalle-panel .mat-mdc-dialog-surface {
+    border-radius: 0;
+  }
+}
+
+body {
+  // Default the application to a light color theme. This can be changed to
+  // `dark` to enable the dark color theme, or to `light dark` to defer to the
+  // user's system settings.
+  color-scheme: light;
+
+  // El fondo detras de todo (shell, paginas) es --app-bg, no
+  // --mat-sys-surface: ese sigue siendo blanco para las tarjetas/modales
+  // que muestran informacion (ver comentario de --app-bg arriba).
+  background-color: var(--app-bg);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+
+  // Reset the user agent margin.
+  margin: 0;
+  height: 100%;
+}
+/* You can add global styles to this file, and also import other style files */

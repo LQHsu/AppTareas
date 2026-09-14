@@ -1,0 +1,22 @@
+<div class="login-page">
+  <mat-card class="login-card">
+    <div class="login-brand">
+      <h1>Gestor de Tareas UAMX</h1>
+      <p class="login-subtitle">Inicia sesión con tu cuenta institucional</p>
+    </div>
+
+    @if (checkingSession) {
+      <div class="login-loading">
+        <mat-spinner diameter="32"></mat-spinner>
+        <p>Verificando tu sesión…</p>
+      </div>
+    } @else {
+      <button mat-flat-button color="primary" class="login-button" (click)="onLogin()">
+        <mat-icon>login</mat-icon>
+        Iniciar sesión
+      </button>
+    }
+
+    <p class="login-footer">Universidad Autónoma Metropolitana - Xochimilco</p>
+  </mat-card>
+</div>

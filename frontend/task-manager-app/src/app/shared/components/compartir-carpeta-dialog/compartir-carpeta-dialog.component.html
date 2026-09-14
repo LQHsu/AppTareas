@@ -1,0 +1,54 @@
+<h2 mat-dialog-title>Compartir «{{ data.folder.name }}»</h2>
+
+<mat-dialog-content class="compartir__body">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="compartir__campo">
+    <mat-label>Compartir con</mat-label>
+    <mat-select [ngModel]="seleccionado()" (ngModelChange)="seleccionado.set($event)">
+      @for (u of data.candidatos; track u.id) {
+        <mat-option [value]="u.id">{{ u.fullName }}</mat-option>
+      }
+      @if (data.candidatos.length === 0) {
+        <mat-option disabled>No hay más personas en tu área</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <div class="aviso">
+    <mat-icon class="aviso__icono">warning</mat-icon>
+    <div>
+      <p class="aviso__titulo">Esto reasignará tareas</p>
+      <p class="aviso__texto">
+        Al compartir, las
+        <strong>{{ data.folder.taskCount }}</strong>
+        tarea{{ data.folder.taskCount === 1 ? '' : 's' }} de
+        {{ data.folder.projectCount === 1 ? 'el proyecto' : 'los' }}
+        @if (data.folder.projectCount !== 1) {
+          <strong>{{ data.folder.projectCount }}</strong> proyectos
+        }
+        de esta carpeta pasarán a estar asignadas a esa persona, sin importar
+        quién las tuviera antes.
+      </p>
+      <p class="aviso__texto">
+        <strong>No se puede deshacer:</strong> no se guarda un registro de quién
+        tenía cada tarea, así que dejar de compartir después no las devuelve.
+      </p>
+      <p class="aviso__texto">
+        La persona también quedará como miembro de esos proyectos.
+      </p>
+    </div>
+  </div>
+
+  @if (data.folder.sharedWithFullName) {
+    <p class="nota-actual">
+      Ahora está compartida con <strong>{{ data.folder.sharedWithFullName }}</strong>.
+      Al elegir a alguien más, las tareas se reasignan a la nueva persona.
+    </p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Cancelar</button>
+  <button mat-flat-button [disabled]="!seleccionado()" (click)="confirmar()">
+    Compartir y reasignar
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,18 @@
+# Secretos reales - solo .env.example se commitea
+.env
+
+# Export del realm: por default "kc.sh export" incluye las claves
+# criptograficas del realm (firma JWT, encriptacion) en
+# components."org.keycloak.keys.KeyProvider" - eso SI es secreto real (con
+# eso se pueden falsificar tokens) y se quita a mano antes de commitear.
+# apptareas-realm.json ya se limpio (ver README) - se permite explicito;
+# cualquier export nuevo queda bloqueado por default hasta limpiarlo igual.
+import/*.json
+!import/apptareas-realm.json
+
+# Jar del SPI custom (Fase 3) es un build output del proyecto Maven,
+# no se commitea el binario.
+providers/*.jar
+
+!import/.gitkeep
+!providers/.gitkeep

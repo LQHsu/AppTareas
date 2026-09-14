@@ -1,0 +1,70 @@
+@use '@angular/material' as mat;
+
+// Mismo ajuste que tarea-card/proyecto-estadisticas: sin esto, el
+// mat-form-field con appearance="outline" (el select de "Asignar a" del
+// formulario de nueva tarea) mide ~56px de alto por default y se ve
+// enorme al lado del resto de texto.
+:host {
+  @include mat.form-field-density(-3);
+}
+
+.mis-tareas-page {
+  margin: 0 auto;
+  padding: 24px;
+}
+
+// 80% del ancho de pantalla en vez de un limite fijo (ver mismo cambio
+// en proyectos.component.scss).
+@media (min-width: 600px) {
+  .mis-tareas-page {
+    max-width: 80vw;
+  }
+}
+
+.mis-tareas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.mis-tareas-header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.create-card {
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.create-field {
+  width: 100%;
+}
+
+.create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mis-tareas-error {
+  color: var(--mat-sys-error, #b3261e);
+  margin-bottom: 16px;
+}
+
+.mis-tareas-loading,
+.mis-tareas-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: rgba(0, 0, 0, 0.6);
+}

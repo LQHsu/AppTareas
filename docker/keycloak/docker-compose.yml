@@ -1,0 +1,62 @@
+name: apptareas-keycloak
+
+services:
+  keycloak-db:
+    image: postgres:16-alpine
+    container_name: apptareas-keycloak-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-keycloak}
+      POSTGRES_USER: ${POSTGRES_USER:-keycloak}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-keycloak} -d ${POSTGRES_DB:-keycloak}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: apptareas-keycloak
+    restart: unless-stopped
+    # start-dev es suficiente para las Fases 0-5 (config por Admin Console,
+    # pruebas locales). Antes del corte a produccion (Fase 6) esto cambia a
+    # "start" + hostname real + TLS - ver docker/keycloak/README.md.
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${POSTGRES_DB:-keycloak}
+      KC_DB_USERNAME: ${POSTGRES_USER:-keycloak}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}
+      # Reemplaza a KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD (deprecados) desde
+      # Keycloak 26. Solo se usan la primera vez que arranca (crean al admin
+      # inicial); cambiarlos despues no hace nada, se administra desde la UI.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USER:?falta KC_ADMIN_USER en .env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?falta KC_ADMIN_PASSWORD en .env}
+      KC_HOSTNAME: ${KC_HOSTNAME:-localhost}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      # Export del realm (Fase 2) - se importa solo al arrancar (--import-realm).
+      - ./import:/opt/keycloak/data/import
+      # SPI custom de LDAP+DB institucional (Fase 3). Vacio por ahora.
+      - ./providers:/opt/keycloak/providers
+    ports:
+      # Solo localhost: nunca se expone directo a internet, va detras de
+      # Apache como reverse proxy (mismo patron ya planeado para Kestrel).
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  keycloak_db_data:

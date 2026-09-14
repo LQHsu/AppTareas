@@ -1,0 +1,107 @@
+<div class="stats">
+  <!-- FILTRO -->
+  <div class="stats__filtro">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="filtro-campo">
+      <mat-label>Filtrar por persona asignada</mat-label>
+      <mat-select
+        [value]="filtroUsuario()"
+        (selectionChange)="filtroUsuario.set($event.value)"
+      >
+        <mat-option value="all">Todas las personas</mat-option>
+        <mat-option [value]="null">Sin asignar</mat-option>
+        @for (member of members(); track member.userId) {
+          <mat-option [value]="member.userId">{{ member.fullName }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <!-- TARJETAS -->
+  <div class="stats__cards">
+    <mat-card class="stat-card stat-card--destacada">
+      <span class="stat-card__label">Completado</span>
+      <span class="stat-card__valor">{{ porcentaje() }}%</span>
+      <mat-progress-bar
+        class="stat-card__barra"
+        mode="determinate"
+        [value]="porcentaje()"
+      ></mat-progress-bar>
+      <span class="stat-card__nota">
+        {{ completadas() }} de {{ total() - canceladas() }} tareas activas
+      </span>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <span class="stat-card__label">Total de tareas</span>
+      <span class="stat-card__valor">{{ total() }}</span>
+      <span class="stat-card__nota">Incluye subtareas</span>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <span class="stat-card__label">Completadas</span>
+      <span class="stat-card__valor stat-card__valor--ok">{{ completadas() }}</span>
+      <span class="stat-card__nota">
+        @if (canceladas() > 0) {
+          {{ canceladas() }} cancelada{{ canceladas() === 1 ? '' : 's' }}
+        } @else {
+          Sin tareas canceladas
+        }
+      </span>
+    </mat-card>
+  </div>
+
+  <!-- GRAFICO -->
+  <mat-card class="grafico">
+    <h3 class="grafico__titulo">Tareas por estado</h3>
+
+    @if (total() === 0) {
+      <p class="vacio">
+        No hay tareas que coincidan con el filtro seleccionado.
+      </p>
+    } @else {
+      <div class="grafico__cuerpo">
+        <svg class="donut" viewBox="0 0 42 42" role="img" aria-label="Distribución de tareas por estado">
+          <g transform="rotate(-90 21 21)">
+            <circle
+              class="donut__pista"
+              cx="21"
+              cy="21"
+              r="15.9155"
+              fill="none"
+              stroke-width="4.5"
+            />
+            @for (s of segments(); track s.status) {
+              <circle
+                cx="21"
+                cy="21"
+                r="15.9155"
+                fill="none"
+                stroke-width="4.5"
+                [attr.stroke]="s.color"
+                [attr.stroke-dasharray]="s.dashArray"
+                [attr.stroke-dashoffset]="s.dashOffset"
+              >
+                <title>{{ s.label }}: {{ s.count }}</title>
+              </circle>
+            }
+          </g>
+          <text class="donut__num" x="21" y="20.5" text-anchor="middle">{{ total() }}</text>
+          <text class="donut__lbl" x="21" y="25" text-anchor="middle">
+            {{ total() === 1 ? 'tarea' : 'tareas' }}
+          </text>
+        </svg>
+
+        <ul class="leyenda">
+          @for (s of segments(); track s.status) {
+            <li class="leyenda__item">
+              <span class="leyenda__punto" [style.background]="s.color"></span>
+              <span class="leyenda__label">{{ s.label }}</span>
+              <span class="leyenda__count">{{ s.count }}</span>
+              <span class="leyenda__pct">{{ percentLabel(s) }}%</span>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+  </mat-card>
+</div>

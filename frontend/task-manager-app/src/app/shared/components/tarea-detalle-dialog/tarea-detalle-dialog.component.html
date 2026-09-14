@@ -1,0 +1,26 @@
+<header class="dialog__head">
+  <span class="dialog__eyebrow">Detalle de tarea</span>
+  <button mat-icon-button mat-dialog-close aria-label="Cerrar" class="dialog__cerrar">
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<mat-dialog-content class="dialog__body">
+  <app-tarea-card
+    [task]="task()"
+    [members]="data.members"
+    [showProject]="data.showProject"
+    [isProjectOwner]="data.isProjectOwner ?? false"
+    (assigneeChange)="assigneeChange.emit($event)"
+    (statusChange)="statusChange.emit($event)"
+    (subtaskAssigneeChange)="subtaskAssigneeChange.emit($event)"
+    (subtaskStatusChange)="subtaskStatusChange.emit($event)"
+    (subtaskCreate)="subtaskCreate.emit($event)"
+    (detailsChange)="detailsChange.emit($event)"
+    (subtaskDetailsChange)="subtaskDetailsChange.emit($event)"
+  />
+</mat-dialog-content>
+
+<mat-dialog-actions class="dialog__acciones">
+  <button mat-flat-button mat-dialog-close>Cerrar</button>
+</mat-dialog-actions>

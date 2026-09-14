@@ -1,0 +1,213 @@
+.carpetas-page {
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+// 80% del ancho de pantalla en vez de un limite fijo (ver mismo cambio
+// en proyectos.component.scss).
+@media (min-width: 600px) {
+  .carpetas-page {
+    max-width: 80vw;
+  }
+}
+
+.carpetas-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.carpetas-header h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.carpetas-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--app-text-muted);
+}
+
+.seccion {
+  margin: 28px 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+
+  &:first-of-type {
+    margin-top: 0;
+  }
+}
+
+/* ---------- Crear ---------- */
+
+.crear-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--app-border);
+  box-shadow: none;
+}
+
+.crear-input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--app-blue);
+    box-shadow: 0 0 0 1px var(--app-blue);
+  }
+}
+
+.crear-acciones {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- Tarjetas ---------- */
+
+.carpetas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.carpeta-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--app-border);
+  box-shadow: none;
+}
+
+.carpeta-card--ajena {
+  background: var(--app-surface-subtle);
+}
+
+.carpeta-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.carpeta-card__icono {
+  flex: none;
+  color: var(--app-blue);
+}
+
+.carpeta-card__nombre {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.carpeta-card__stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat {
+  font-size: 12.5px;
+  color: var(--app-text-muted);
+
+  strong {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--app-text);
+    margin-right: 3px;
+  }
+}
+
+.compartida {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--app-blue-soft);
+  font-size: 12px;
+  color: var(--app-blue-strong);
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+  }
+}
+
+.compartida--no {
+  background: var(--app-surface-subtle);
+  color: var(--app-text-subtle);
+}
+
+.carpeta-card__acciones {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* ---------- Estados y mensajes ---------- */
+
+.estado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 56px 16px;
+  text-align: center;
+  color: var(--app-text-muted);
+
+  p {
+    margin: 0;
+    font-size: 13px;
+  }
+}
+
+.estado__icono {
+  font-size: 40px;
+  width: 40px;
+  height: 40px;
+  color: var(--app-text-subtle);
+}
+
+.mensaje {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.mensaje--error {
+  background: var(--app-red-soft);
+  color: var(--app-red-strong);
+}
+
+.mensaje--ok {
+  background: var(--app-green-soft);
+  color: var(--app-green-strong);
+}
+
+@media (max-width: 600px) {
+  .carpetas-header {
+    flex-direction: column;
+  }
+
+  .carpetas-grid {
+    grid-template-columns: 1fr;
+  }
+}

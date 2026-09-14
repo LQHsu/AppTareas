@@ -1,0 +1,56 @@
+.admin-page {
+  margin: 0 auto;
+  padding: 24px;
+}
+
+// 80% del ancho de pantalla en vez de un limite fijo (ver mismo cambio
+// en proyectos.component.scss).
+@media (min-width: 600px) {
+  .admin-page {
+    max-width: 80vw;
+  }
+}
+
+.admin-header {
+  margin-bottom: 20px;
+}
+
+.admin-header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.admin-error {
+  color: var(--mat-sys-error, #b3261e);
+  margin-bottom: 16px;
+}
+
+.admin-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.tab-content {
+  padding-top: 16px;
+  overflow-x: auto;
+}
+
+.admin-tabla {
+  width: 100%;
+}
+
+.not-applicable {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.self-badge {
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+}

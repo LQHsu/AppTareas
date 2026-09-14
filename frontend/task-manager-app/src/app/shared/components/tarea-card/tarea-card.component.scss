@@ -1,0 +1,574 @@
+@use '@angular/material' as mat;
+
+// Los mat-form-field con appearance="outline" miden ~56px de alto por
+// default, lo que los hacia ver enormes al lado de textos de 13px. Con
+// densidad negativa + subscriptSizing="dynamic" en el template (que
+// quita el espacio reservado para hints/errores) quedan proporcionados
+// al resto del contenido.
+:host {
+  @include mat.form-field-density(-3);
+}
+
+.tarea {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--app-text);
+}
+
+/* ---------- Encabezado ---------- */
+
+.tarea__head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 18px;
+}
+
+.tarea__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tarea__title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.tarea__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.btn-editar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--app-text-subtle);
+
+  &:hover {
+    color: var(--app-blue);
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.input-titulo {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 8px;
+  background: var(--app-surface);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--app-text);
+
+  &:focus {
+    outline: none;
+    border-color: var(--app-blue);
+    box-shadow: 0 0 0 1px var(--app-blue);
+  }
+}
+
+.edicion__acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--app-text-muted);
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: var(--app-text-subtle);
+  }
+}
+
+/* ---------- Badge de estado ---------- */
+// Un color por estado (border + texto en ese color, fondo en su
+// variante "-soft"), mismo esquema que TareasTablaComponent.badgeEstado
+// — los colores viven en styles.scss (--estado-*) para no duplicarlos.
+
+.badge {
+  flex: none;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.badge--creada {
+  background: var(--estado-creada-soft);
+  border-color: var(--estado-creada);
+  color: var(--estado-creada);
+}
+
+.badge--asignada {
+  background: var(--estado-asignada-soft);
+  border-color: var(--estado-asignada);
+  color: var(--estado-asignada);
+}
+
+.badge--leida {
+  background: var(--estado-leida-soft);
+  border-color: var(--estado-leida);
+  color: var(--estado-leida);
+}
+
+.badge--en-atencion {
+  background: var(--estado-en-atencion-soft);
+  border-color: var(--estado-en-atencion);
+  color: var(--estado-en-atencion);
+}
+
+.badge--atendida {
+  background: var(--estado-atendida-soft);
+  border-color: var(--estado-atendida);
+  color: var(--estado-atendida);
+}
+
+.badge--volver-a-revisar {
+  background: var(--estado-volver-a-revisar-soft);
+  border-color: var(--estado-volver-a-revisar);
+  color: var(--estado-volver-a-revisar);
+}
+
+.badge--terminada {
+  background: var(--estado-terminada-soft);
+  border-color: var(--estado-terminada);
+  color: var(--estado-terminada);
+}
+
+.badge--cancelada {
+  background: var(--estado-cancelada-soft);
+  border-color: var(--estado-cancelada);
+  color: var(--estado-cancelada);
+}
+
+/* ---------- Bloques / secciones ---------- */
+
+// Cada bloque se separa del anterior con una linea, para que las partes
+// del modal se lean como secciones distintas y no como un solo chorro.
+.bloque {
+  padding: 18px 0;
+  border-top: 1px solid var(--app-border);
+
+  &:last-child {
+    padding-bottom: 4px;
+  }
+}
+
+.bloque__titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+.bloque__titulo--inline {
+  margin: 0;
+  flex: 1;
+  text-align: left;
+}
+
+// Encabezado clicable de los bloques colapsables (adjuntos, comentarios)
+.bloque__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+
+  &:hover .bloque__titulo--inline,
+  &:hover .bloque__chevron {
+    color: var(--app-blue);
+  }
+}
+
+.bloque__toggle-icono {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--app-text-subtle);
+}
+
+.bloque__chevron {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--app-text-subtle);
+}
+
+.bloque__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.contador {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--app-blue-soft);
+  color: var(--app-blue-strong);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+/* ---------- Textos genericos ---------- */
+
+// El resto de la tipografia la pone .contenido-rico (styles.scss).
+// Ojo: aqui NO va white-space: pre-wrap — el contenido ahora es HTML y
+// los saltos del markup se renderizarian como espacios de mas.
+.tarea__desc {
+  margin: 0;
+  word-break: break-word;
+}
+
+.vacio {
+  margin: 0;
+  font-size: 13px;
+  color: var(--app-text-subtle);
+  font-style: italic;
+}
+
+.ayuda {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--app-text-subtle);
+}
+
+.mensaje {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.mensaje--error {
+  background: var(--app-red-soft);
+  color: var(--app-red-strong);
+}
+
+/* ---------- Campos ---------- */
+
+.campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.campo {
+  width: 100%;
+}
+
+.campo--full {
+  grid-column: 1 / -1;
+}
+
+// La version de solo lectura de "Persona asignada" (cuando no hay
+// `members`, ver template) ahora es un mat-form-field real con un
+// input disabled, no un div a medida: hereda el mismo alto/borde que
+// el select de "Estado" de al lado sin necesidad de CSS que los
+// empareje a mano.
+::ng-deep .campo .mat-mdc-input-element:disabled {
+  color: var(--app-text);
+  -webkit-text-fill-color: var(--app-text);
+  opacity: 1;
+}
+
+/* ---------- Fechas ---------- */
+
+.fechas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.fecha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--app-surface-subtle);
+}
+
+.fecha__icono {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.fecha__icono--info {
+  color: var(--app-blue);
+}
+
+.fecha__icono--ok {
+  color: var(--app-green);
+}
+
+.fecha__label {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--app-text-muted);
+}
+
+.fecha__valor {
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ---------- Subtareas ---------- */
+
+.subtareas {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tarea--subtask {
+  padding: 14px 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface);
+
+  .tarea__title {
+    font-size: 15px;
+  }
+
+  .tarea__head {
+    padding-bottom: 12px;
+  }
+
+  .bloque {
+    padding: 12px 0;
+  }
+}
+
+/* ---------- Panel de formulario (nueva subtarea / comentario) ---------- */
+
+.panel-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface-subtle);
+}
+
+.panel-form__acciones {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.accion-bloque {
+  align-self: flex-start;
+}
+
+/* ---------- Archivos adjuntos ---------- */
+
+.lista-archivos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.archivo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+}
+
+.archivo__icono {
+  flex: none;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--app-blue);
+}
+
+.archivo__nombre {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--app-blue-strong);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.archivo__meta {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--app-text-subtle);
+  white-space: nowrap;
+}
+
+/* ---------- Comentarios ---------- */
+
+.lista-comentarios {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comentario {
+  padding: 12px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface);
+}
+
+.comentario__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comentario__autor {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.comentario__fecha {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--app-text-subtle);
+}
+
+.comentario__texto {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------- Botones de eliminar (adjunto / comentario) ---------- */
+
+.boton-eliminar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--app-text-subtle);
+
+  &:hover {
+    color: var(--app-red);
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* ---------- Movil ---------- */
+
+@media (max-width: 600px) {
+  .tarea__title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .tarea__meta {
+    gap: 4px 0;
+    flex-direction: column;
+  }
+
+  // Una sola columna: en pantallas angostas dos campos lado a lado
+  // dejaban los selects apretados y con hueco sobrante a la derecha.
+  .campos,
+  .fechas,
+  .panel-form {
+    grid-template-columns: 1fr;
+  }
+
+  .archivo {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .archivo__nombre {
+    flex-basis: calc(100% - 66px);
+  }
+
+  .archivo__meta {
+    flex-basis: 100%;
+    padding-left: 30px;
+    white-space: normal;
+  }
+
+  .accion-bloque {
+    align-self: stretch;
+    width: 100%;
+  }
+}

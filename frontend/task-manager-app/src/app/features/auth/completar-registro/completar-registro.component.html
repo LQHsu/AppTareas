@@ -1,0 +1,52 @@
+<div class="registro-page">
+  <mat-card class="registro-card">
+    <h1>Completa tu registro</h1>
+    <p class="registro-subtitle">
+      Ya confirmamos tu identidad institucional. Solo falta indicar tu área para terminar.
+    </p>
+
+    <div class="registro-datos">
+      <p><strong>Nombre:</strong> {{ fullName() }}</p>
+      <p><strong>Correo:</strong> {{ email() }}</p>
+    </div>
+
+    @if (loadingAreas()) {
+      <div class="registro-loading">
+        <mat-spinner diameter="28"></mat-spinner>
+        <p>Cargando áreas…</p>
+      </div>
+    } @else {
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="registro-form">
+        <mat-form-field appearance="outline" class="registro-select">
+          <mat-label>Área</mat-label>
+          <mat-select formControlName="areaId">
+            @for (area of areas(); track area.id) {
+              <mat-option [value]="area.id">{{ area.nombre }}</mat-option>
+            }
+          </mat-select>
+          @if (form.get('areaId')?.hasError('required') && form.get('areaId')?.touched) {
+            <mat-error>Selecciona un área</mat-error>
+          }
+        </mat-form-field>
+
+        @if (errorMessage()) {
+          <p class="registro-error">{{ errorMessage() }}</p>
+        }
+
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          class="registro-button"
+          [disabled]="submitting()"
+        >
+          @if (submitting()) {
+            <mat-spinner diameter="20" class="registro-button-spinner"></mat-spinner>
+          } @else {
+            Completar registro
+          }
+        </button>
+      </form>
+    }
+  </mat-card>
+</div>

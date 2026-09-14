@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"CompletedTasks\\\\|Count\\(t =>\\\\|\\)\\);\\\\|^\\\\s*[0-9]*-\\\\s*$\")",
+      "Bash(dotnet ef *)",
+      "Bash(npx ng *)"
+    ]
+  }
+}
