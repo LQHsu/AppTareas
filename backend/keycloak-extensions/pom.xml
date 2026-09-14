@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>mx.uam.xoc.apptareas</groupId>
+  <artifactId>keycloak-cusxacdi-provider</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <!--
+    SPI custom de Keycloak para AppTareas (UAM Xochimilco).
+
+    Reemplaza la User Federation LDAP que originalmente se planeo (no
+    existe un LDAP directamente consultable - lo que hay es un wrapper
+    SOAP institucional, CUSXACDI, que internamente habla con un LDAP que
+    no es accesible desde afuera de ese servicio). Este provider:
+
+      1. Autentica (CredentialInputValidator) llamando a
+         ValidaAccesoCuenta_WS (SOAP 1.1 RPC/encoded) con matricula/numero
+         economico + NIP (5 digitos).
+      2. Completa el perfil con RecuperaInfoCuenta_WS (nombre completo) y
+         una consulta directa a la BD MySQL institucional
+         info_usuarios_unidad (correo, area) - pendiente credenciales de
+         esa BD, ver README del modulo.
+
+    Ver docker/keycloak/README.md para como se empaqueta y se monta en el
+    contenedor de Keycloak (carpeta docker/keycloak/providers/).
+  -->
+
+  <properties>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Debe coincidir con la version de imagen de Keycloak en
+         docker/keycloak/docker-compose.yml (la imagen "26.0" resuelve
+         hoy a 26.0.8 - confirmado inspeccionando los jars dentro del
+         contenedor, no asumido). -->
+    <keycloak.version>26.0.8</keycloak.version>
+  </properties>
+
+  <dependencies>
+    <!-- SPIs de Keycloak - "provided": ya estan en el classpath del
+         contenedor, no se empaquetan dentro del jar (evita choques de
+         version con lo que trae Keycloak). -->
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-server-spi</artifactId>
+      <version>${keycloak.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-server-spi-private</artifactId>
+      <version>${keycloak.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-core</artifactId>
+      <version>${keycloak.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- UserStorageProvider / UserStorageProviderFactory /
+         AbstractUserAdapterFederatedStorage viven aqui, no en
+         server-spi (confirmado inspeccionando los jars reales del
+         contenedor - la reorganizacion de modulos de Keycloak no
+         siempre coincide con lo que documentan guias viejas). -->
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-model-storage</artifactId>
+      <version>${keycloak.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- MySQL Connector/J: para consultar info_usuarios_unidad
+         (correo/area). Este si va empaquetado (no viene con Keycloak). -->
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <version>9.1.0</version>
+    </dependency>
+
+    <!-- Nada de libreria SOAP: el WSDL de CUSXACDI es SOAP 1.1
+         RPC/encoded (estilo viejo). Las librerias Java modernas
+         (JAX-WS/CXF) estan pensadas para document/literal y complican
+         mas de lo que ayudan aqui - el sobre XML se arma a mano con
+         java.net.http.HttpClient (JDK estandar, sin dependencia extra),
+         igual que hace nusoap del lado PHP. -->
+  </dependencies>
+
+  <build>
+    <finalName>keycloak-cusxacdi-provider</finalName>
+    <plugins>
+      <!-- shade en vez de "compile" simple: empaqueta mysql-connector-j
+           DENTRO del jar (unico scope no-"provided" que tenemos), para
+           que baste con copiar un solo archivo a
+           docker/keycloak/providers/. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

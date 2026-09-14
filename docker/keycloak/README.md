@@ -127,17 +127,77 @@ fs.writeFileSync(path, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 Un Keycloak nuevo que importe este archivo sin ese bloque genera sus
 propias claves automáticamente — no hace falta reponerlas.
 
-## Siguiente paso (Fase 3)
+## Fase 3.1 — hecho (autenticación via CUSXACDI)
 
-SPI custom (Java) para `task-manager-uamx`:
-- `CredentialInputValidator` que autentica contra CUSXACDI (SOAP
-  `ValidaAccesoCuenta`, matrícula + NIP), replicando `isAlumno()` /
-  `soapAuthenticate()` del `AuthModel.php` de `appcafeteria` (mismo
-  criterio: excluir alumnos, matrícula de 10 dígitos).
-- Enriquecer el perfil con `RecuperaInfoCuenta` (nombre completo) y con un
-  `SELECT` a `info_usuarios_unidad` (MySQL, `148.206.99.178`) para
-  correo/área — pendiente credenciales de esa BD (usuario/password aparte
-  de lo que ya está en el `.env` de este stack).
-- Theme custom de login (relabelar "Username"/"Password" a "Matrícula o
-  número económico"/"NIP") — se hace junto con el SPI, después de que el
-  login funcional ya sirva con los campos genéricos.
+`backend/keycloak-extensions/` (proyecto Maven aparte, no es parte de la
+solución .NET) implementa un `UserStorageProvider` custom
+(`cusxacdi-uamx`) que autentica contra el SOAP institucional CUSXACDI en
+vez de una User Federation LDAP (ver más arriba por qué). Confirmado
+funcionando con un login real de un trabajador (matrícula + NIP) el
+2026-09-14.
+
+### Build del jar (sin instalar Java/Maven en el servidor)
+
+```bash
+cd backend/keycloak-extensions
+MSYS_NO_PATHCONV=1 docker run --rm \
+  -v "$(pwd -W 2>/dev/null || pwd)":/workspace \
+  -w /workspace \
+  maven:3.9-eclipse-temurin-21 \
+  mvn -B -q clean package
+
+cp target/keycloak-cusxacdi-provider.jar ../../docker/keycloak/providers/
+```
+
+Luego, con el stack corriendo:
+
+```bash
+cd docker/keycloak
+export MSYS_NO_PATHCONV=1
+docker compose exec keycloak /opt/keycloak/bin/kc.sh build
+docker compose restart keycloak
+```
+
+Repetir este ciclo completo cada vez que cambie el código Java.
+
+**Versión de Keycloak vs. dependencias Maven**: la imagen `26.0` del
+`docker-compose.yml` resuelve hoy a `26.0.8` internamente — confirmado
+inspeccionando los jars reales del contenedor (`docker compose cp` +
+`javap`), no asumido. El `pom.xml` fija `keycloak.version` a esa misma
+versión exacta a propósito: un desalineamiento causa `NoSuchMethodError`
+o peor, un `StackOverflowError` silencioso como el de abajo. Si se
+actualiza la imagen de Keycloak, actualizar `keycloak.version` igual.
+
+**Gotcha real ya resuelto (dejar documentado, es fácil de repetir)**: en
+Keycloak 26.x, `AbstractUserAdapterFederatedStorage` NO tiene
+`setUsername`/`setFirstName`/`setLastName` propios (username/nombre se
+manejan como atributos genéricos vía `setSingleAttribute`). Si se
+sobreescribe `setUsername()` y ese override llama a
+`setSingleAttribute(UserModel.USERNAME, ...)`, es una **recursión
+infinita** con la clase base (que internamente llama a `setUsername()`
+al recibir esa key) — se manifiesta como `StackOverflowError` en el login
+("internal server error" genérico en la UI, sin pista del problema real
+salvo mirando los logs). Ver el comentario en `CusxacdiUserAdapter.java`.
+
+**Nota de UX (no bug)**: justo después del primer login, Keycloak puede
+mostrar "Update Account Information" pidiendo completar el perfil — es el
+Required Action `Update Profile` disparándose porque el usuario llega sin
+email (Fase 3.2 todavía no lo completa). Se desactivó temporalmente en
+Authentication → Required Actions para no estorbar mientras se prueba;
+debería dejar de aparecer solo una vez que el email real se puebla desde
+`info_usuarios_unidad`. Reevaluar si reactivarlo antes de producción.
+
+## Siguiente paso (Fase 3.2 — correo y área desde MySQL)
+
+`CusxacdiUserAdapter` ya tiene el punto marcado con `TODO Fase 3.2`: un
+`SELECT` a `info_usuarios_unidad` (MySQL, `148.206.99.178`) por matrícula,
+para poblar `UserModel.EMAIL` y un atributo `area` (vía
+`setSingleAttribute`, mismo patrón que nombres/apellidos). Pendiente
+credenciales de esa BD (usuario/password aparte de lo que ya está en el
+`.env` de este stack — la que se compartió en el chat ya se marcó para
+rotar).
+
+Después de eso: Protocol Mapper (config, no código) para exponer el
+atributo `area` como claim custom en el token de `task-manager-uamx`, y
+el theme custom de login (relabelar "Username"/"Password" a "Matrícula o
+número económico"/"NIP").

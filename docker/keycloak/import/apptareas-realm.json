@@ -1620,6 +1620,22 @@
           ]
         }
       }
+    ],
+    "org.keycloak.storage.UserStorageProvider": [
+      {
+        "id": "ed3cfaa0-df28-42aa-8835-a737add500b3",
+        "name": "CUSXACDI",
+        "providerId": "cusxacdi-uamx",
+        "subComponents": {},
+        "config": {
+          "cachePolicy": [
+            "DEFAULT"
+          ],
+          "enabled": [
+            "true"
+          ]
+        }
+      }
     ]
   },
   "internationalizationEnabled": false,
@@ -2119,7 +2135,7 @@
         {
           "authenticator": "registration-page-form",
           "authenticatorFlow": true,
-          "requirement": "REQUIRED",
+          "requirement": "DISABLED",
           "priority": 10,
           "autheticatorFlow": true,
           "flowAlias": "registration form",
