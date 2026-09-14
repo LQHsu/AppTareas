@@ -56,26 +56,27 @@ public class ProjectMembersController : ControllerBase
     public async Task<IActionResult> Add(Guid projectId, AddProjectMemberDto dto)
     {
         var userId = GetUserIdFromToken();
+        var inviteeId = dto.UserId.ToLowerInvariant(); // ver comentario en User.Id
 
         var project = await _db.Projects.FindAsync(projectId);
         if (project is null) return NotFound();
 
         if (project.OwnerId != userId) return Forbid();
 
-        var invitee = await _db.Users.FindAsync(dto.UserId);
+        var invitee = await _db.Users.FindAsync(inviteeId);
         if (invitee is null) return BadRequest("Usuario invalido.");
 
         if (invitee.AreaId != project.AreaId)
             return BadRequest("Solo puedes invitar personas de la misma area del proyecto.");
 
         var alreadyMember = await _db.ProjectMembers
-            .AnyAsync(m => m.ProjectId == projectId && m.UserId == dto.UserId);
+            .AnyAsync(m => m.ProjectId == projectId && m.UserId == inviteeId);
         if (alreadyMember) return Conflict("El usuario ya es miembro del proyecto.");
 
         _db.ProjectMembers.Add(new ProjectMember
         {
             ProjectId = projectId,
-            UserId = dto.UserId,
+            UserId = inviteeId,
             JoinedAt = DateTime.UtcNow,
         });
 
@@ -87,9 +88,10 @@ public class ProjectMembersController : ControllerBase
     // DELETE /api/projects/{projectId}/members/{memberUserId}
     // Solo el dueno puede quitar miembros. El dueno no se puede quitar
     // a si mismo por esta via (tendria que transferir o borrar el proyecto).
-    [HttpDelete("{memberUserId:guid}")]
-    public async Task<IActionResult> Remove(Guid projectId, Guid memberUserId)
+    [HttpDelete("{memberUserId}")]
+    public async Task<IActionResult> Remove(Guid projectId, string memberUserId)
     {
+        memberUserId = memberUserId.ToLowerInvariant(); // ver comentario en User.Id
         var userId = GetUserIdFromToken();
 
         var project = await _db.Projects.FindAsync(projectId);
@@ -109,11 +111,12 @@ public class ProjectMembersController : ControllerBase
         return NoContent();
     }
 
-    private Guid GetUserIdFromToken()
+    private string GetUserIdFromToken()
     {
         var sub = User.FindFirst("sub")?.Value
             ?? throw new InvalidOperationException("Token sin claim 'sub'.");
 
-        return Guid.Parse(sub);
+        // Normalizado a minusculas - ver comentario en User.Id.
+        return sub.ToLowerInvariant();
     }
 }

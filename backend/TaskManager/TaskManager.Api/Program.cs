@@ -43,7 +43,12 @@ else
             options.Authority = keycloakAuthority;
             options.Audience = builder.Configuration["Keycloak:ClientId"]; // "task-manager-uamx"
             options.MapInboundClaims = false;
-            options.RequireHttpsMetadata = true;
+            // El Keycloak propio en Docker corre en HTTP en dev
+            // (docker/keycloak/, "start-dev" sin TLS - ver su README).
+            // Exigir HTTPS metadata ahi tumbaria el arranque al intentar
+            // descargar /.well-known/openid-configuration. En produccion
+            // (Fase 6) el Authority real usa HTTPS y esto vuelve a exigirse.
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
 
             // SignalR (websockets/SSE) no puede mandar el header
             // "Authorization" en el handshake de conexion: el cliente

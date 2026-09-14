@@ -29,8 +29,11 @@ public class BanCheckMiddleware
         {
             var sub = context.User.FindFirst("sub")?.Value;
 
-            if (sub is not null && Guid.TryParse(sub, out var userId))
+            // Normalizado a minusculas por la misma razon que
+            // GetUserIdFromToken() en cada controller - ver User.cs.
+            if (!string.IsNullOrEmpty(sub))
             {
+                var userId = sub.ToLowerInvariant();
                 var isBanned = await db.Users
                     .AsNoTracking()
                     .Where(u => u.Id == userId)

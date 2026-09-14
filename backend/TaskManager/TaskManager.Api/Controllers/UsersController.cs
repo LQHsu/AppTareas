@@ -63,7 +63,9 @@ public class UsersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UserDto>> Create(CreateUserDto dto)
     {
-        var exists = await _db.Users.AnyAsync(u => u.Id == dto.Id);
+        var id = dto.Id.ToLowerInvariant(); // ver comentario en User.Id
+
+        var exists = await _db.Users.AnyAsync(u => u.Id == id);
         if (exists) return Conflict("El usuario ya esta registrado.");
 
         var areaExists = await _db.Areas.AnyAsync(a => a.Id == dto.AreaId);
@@ -71,7 +73,7 @@ public class UsersController : ControllerBase
 
         var user = new User
         {
-            Id = dto.Id,
+            Id = id,
             Username = dto.Username,
             Email = dto.Email,
             FullName = dto.FullName,
@@ -89,12 +91,13 @@ public class UsersController : ControllerBase
         return CreatedAtAction(nameof(GetMe), new UserDto(user.Id, user.Username, user.Email, user.FullName, user.AreaId, area!.Nombre, user.IsSuperAdmin, user.IsBanned));
     }
 
-    private Guid GetUserIdFromToken()
+    private string GetUserIdFromToken()
     {
         // El "sub" del JWT de Keycloak es el identificador estable del usuario
         var sub = User.FindFirst("sub")?.Value
             ?? throw new InvalidOperationException("Token sin claim 'sub'.");
 
-        return Guid.Parse(sub);
+        // Normalizado a minusculas - ver comentario en User.Id.
+        return sub.ToLowerInvariant();
     }
 }

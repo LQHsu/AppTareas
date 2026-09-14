@@ -140,7 +140,7 @@ public class FoldersController : ControllerBase
         if (folder.OwnerId != userId) return Forbid();
 
         // Dejar de compartir: solo se limpia la referencia.
-        if (!dto.UserId.HasValue)
+        if (dto.UserId is null)
         {
             folder.SharedWithId = null;
             folder.SharedAt = null;
@@ -149,11 +149,13 @@ public class FoldersController : ControllerBase
             return Ok(new ShareFolderResultDto(await BuildDto(folder, userId), 0));
         }
 
-        if (dto.UserId.Value == userId)
+        var targetId = dto.UserId.ToLowerInvariant(); // ver comentario en User.Id
+
+        if (targetId == userId)
             return BadRequest("No puedes compartir una carpeta contigo mismo.");
 
         var owner = await _db.Users.FindAsync(userId);
-        var target = await _db.Users.FindAsync(dto.UserId.Value);
+        var target = await _db.Users.FindAsync(targetId);
         if (owner is null || target is null) return BadRequest("Usuario invalido.");
 
         // Misma regla que invitar a un proyecto: solo gente de tu area.
@@ -229,11 +231,11 @@ public class FoldersController : ControllerBase
         return Ok(new ShareFolderResultDto(await BuildDto(folder, userId), reasignadas));
     }
 
-    private async Task<FolderDto> BuildDto(ProjectFolder folder, Guid viewerId)
+    private async Task<FolderDto> BuildDto(ProjectFolder folder, string viewerId)
     {
         var owner = await _db.Users.FindAsync(folder.OwnerId);
-        var sharedWith = folder.SharedWithId.HasValue
-            ? await _db.Users.FindAsync(folder.SharedWithId.Value)
+        var sharedWith = folder.SharedWithId is not null
+            ? await _db.Users.FindAsync(folder.SharedWithId)
             : null;
 
         var projectCount = await _db.Projects.CountAsync(p => p.FolderId == folder.Id);
@@ -254,11 +256,12 @@ public class FoldersController : ControllerBase
         new(f.Id, f.Name, f.OwnerId, ownerName, f.SharedWithId, sharedWithName, f.SharedAt,
             f.CreatedAt, projectCount, taskCount, isOwner);
 
-    private Guid GetUserIdFromToken()
+    private string GetUserIdFromToken()
     {
         var sub = User.FindFirst("sub")?.Value
             ?? throw new InvalidOperationException("Token sin claim 'sub'.");
 
-        return Guid.Parse(sub);
+        // Normalizado a minusculas - ver comentario en User.Id.
+        return sub.ToLowerInvariant();
     }
 }

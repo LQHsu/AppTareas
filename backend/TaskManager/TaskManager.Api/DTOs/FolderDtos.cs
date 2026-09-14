@@ -5,9 +5,9 @@ namespace TaskManager.Api.DTOs;
 public record FolderDto(
     Guid Id,
     string Name,
-    Guid OwnerId,
+    string OwnerId,
     string OwnerFullName,
-    Guid? SharedWithId,
+    string? SharedWithId,
     string? SharedWithFullName,
     DateTime? SharedAt,
     DateTime CreatedAt,
@@ -23,7 +23,7 @@ public record CreateFolderDto(string Name);
 public record UpdateFolderDto(string Name);
 
 // UserId null = dejar de compartir (no reasigna nada, ver ShareFolder).
-public record ShareFolderDto(Guid? UserId);
+public record ShareFolderDto(string? UserId);
 
 // Resultado de compartir: cuantas tareas se reasignaron de verdad.
 public record ShareFolderResultDto(FolderDto Folder, int ReassignedTasks);

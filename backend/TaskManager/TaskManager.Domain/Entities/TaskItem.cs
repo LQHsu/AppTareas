@@ -26,10 +26,10 @@ public class TaskItem
     public int AreaId { get; set; }
     public Area Area { get; set; } = null!;
  
-    public Guid CreatedById { get; set; }
+    public string CreatedById { get; set; } = string.Empty;
     public User CreatedBy { get; set; } = null!;
  
-    public Guid? AssignedToId { get; set; }
+    public string? AssignedToId { get; set; }
     public User? AssignedTo { get; set; }
  
     public TaskItemStatus Status { get; set; } = TaskItemStatus.Creada;

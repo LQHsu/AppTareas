@@ -13,9 +13,9 @@ public record TaskItemDto(
     string Title,
     string? Description,
     int AreaId,
-    Guid CreatedById,
+    string CreatedById,
     string CreatedByFullName,
-    Guid? AssignedToId,
+    string? AssignedToId,
     string? AssignedToFullName,
     TaskItemStatus Status,
     DateTime? FechaAsignacion,
@@ -33,14 +33,14 @@ public record CreateTaskDto(
     string Title,
     string? Description,
     Guid? ProjectId,
-    Guid? AssignedToId,
+    string? AssignedToId,
     Guid? ParentTaskId
 );
 
 public record UpdateTaskStatusDto(TaskItemStatus Status);
 
 // AssignedToId nulo = quitar la asignacion (vuelve a quedar sin asignar).
-public record UpdateTaskAssigneeDto(Guid? AssignedToId);
+public record UpdateTaskAssigneeDto(string? AssignedToId);
 
 // Description viene como HTML (lo produce app-editor-texto).
 public record UpdateTaskDetailsDto(string Title, string? Description);

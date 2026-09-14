@@ -17,12 +17,32 @@ public class AppDbContext : DbContext
     public DbSet<TaskStatusHistory> TaskStatusHistories => Set<TaskStatusHistory>();
     public DbSet<ProjectFolder> ProjectFolders => Set<ProjectFolder>();
  
+    // "sub" de Keycloak: para un usuario federado (ver
+    // CusxacdiUserStorageProvider en docker/keycloak/) es un string
+    // compuesto tipo "f:<uuid>:<matricula>", nunca un Guid. 128 alcanza
+    // de sobra ese formato (~50-60 chars tipicos) con margen. Fijado
+    // explicito (en vez de dejar que EF use el default nvarchar(max) de
+    // "string") porque las columnas indexadas de abajo (HasIndex) no
+    // pueden ser nvarchar(max) en SQL Server.
+    private const int UserIdMaxLength = 128;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<User>().Property(u => u.Id).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<Project>().Property(p => p.OwnerId).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<ProjectFolder>().Property(f => f.OwnerId).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<ProjectFolder>().Property(f => f.SharedWithId).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<ProjectMember>().Property(m => m.UserId).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<TaskAttachment>().Property(a => a.UploadedById).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<TaskComment>().Property(c => c.UserId).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<TaskItem>().Property(t => t.CreatedById).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<TaskItem>().Property(t => t.AssignedToId).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<TaskStatusHistory>().Property(h => h.ChangedById).HasMaxLength(UserIdMaxLength);
+
         // Clave compuesta para la tabla intermedia Project <-> User
         modelBuilder.Entity<ProjectMember>()
             .HasKey(pm => new { pm.ProjectId, pm.UserId });
- 
+
         // Restrict en User -> Area y Project -> Area/Owner para evitar el error
         // de SQL Server "multiple cascade paths" (Area->User->Project y
         // Area->Project serian dos caminos de cascada hacia la misma tabla).

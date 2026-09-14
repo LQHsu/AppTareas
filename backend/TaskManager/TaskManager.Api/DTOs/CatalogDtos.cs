@@ -3,7 +3,7 @@ namespace TaskManager.Api.DTOs;
 public record AreaDto(int Id, string Nombre);
 
 public record UserDto(
-    Guid Id,
+    string Id,
     string Username,
     string Email,
     string FullName,
@@ -14,7 +14,7 @@ public record UserDto(
 );
 
 public record CreateUserDto(
-    Guid Id, // viene del "sub" del token de Keycloak la primera vez que el usuario entra
+    string Id, // viene del "sub" del token de Keycloak la primera vez que el usuario entra
     string Username,
     string Email,
     string FullName,

@@ -11,13 +11,13 @@ public class ProjectFolder
 
     // Dueno de la carpeta. Solo el puede renombrarla, borrarla, meter o
     // sacar proyectos y compartirla.
-    public Guid OwnerId { get; set; }
+    public string OwnerId { get; set; } = string.Empty;
     public User Owner { get; set; } = null!;
 
     // Con quien esta compartida (null = no compartida). Es UNA sola
     // persona a proposito: compartir reasigna todas las tareas de la
     // carpeta a este usuario, y TaskItem.AssignedToId solo admite uno.
-    public Guid? SharedWithId { get; set; }
+    public string? SharedWithId { get; set; }
     public User? SharedWith { get; set; }
 
     public DateTime? SharedAt { get; set; }

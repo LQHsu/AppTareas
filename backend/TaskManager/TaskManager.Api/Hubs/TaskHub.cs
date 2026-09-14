@@ -51,11 +51,16 @@ public class TaskHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, TaskHubGroups.Project(projectId));
     }
 
-    private Guid GetUserId()
+    private string GetUserId()
     {
         var sub = Context.User?.FindFirst("sub")?.Value
             ?? throw new InvalidOperationException("Token sin claim 'sub'.");
 
-        return Guid.Parse(sub);
+        // Normalizado a minusculas: el "sub" de un usuario federado (ver
+        // CusxacdiUserStorageProvider) es un string compuesto, no un Guid
+        // que Guid.Parse normalizaba gratis - sin esto, un token con
+        // distinto casing rompería las comparaciones "==" contra lo
+        // guardado en BD.
+        return sub.ToLowerInvariant();
     }
 }

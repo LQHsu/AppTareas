@@ -258,11 +258,12 @@ public class ProjectsController : ControllerBase
         ));
     }
 
-    private Guid GetUserIdFromToken()
+    private string GetUserIdFromToken()
     {
         var sub = User.FindFirst("sub")?.Value
             ?? throw new InvalidOperationException("Token sin claim 'sub'.");
 
-        return Guid.Parse(sub);
+        // Normalizado a minusculas - ver comentario en User.Id.
+        return sub.ToLowerInvariant();
     }
 }

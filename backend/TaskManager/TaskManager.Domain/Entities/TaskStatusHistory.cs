@@ -12,7 +12,7 @@ public class TaskStatusHistory
     public Guid TaskId { get; set; }
     public TaskItem Task { get; set; } = null!;
  
-    public Guid ChangedById { get; set; }
+    public string ChangedById { get; set; } = string.Empty;
     public User ChangedBy { get; set; } = null!;
  
     public TaskItemStatus? OldStatus { get; set; }

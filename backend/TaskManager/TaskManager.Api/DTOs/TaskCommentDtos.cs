@@ -3,7 +3,7 @@ namespace TaskManager.Api.DTOs;
 public record TaskCommentDto(
     Guid Id,
     Guid TaskId,
-    Guid UserId,
+    string UserId,
     string UserFullName,
     string Content,
     DateTime CreatedAt

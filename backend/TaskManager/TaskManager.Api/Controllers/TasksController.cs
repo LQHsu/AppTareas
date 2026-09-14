@@ -34,7 +34,7 @@ public class TasksController : ControllerBase
     // no aparece en `task`/`dto`) tambien necesita el evento — si no, su
     // "Mis tareas" nunca se entera de que la tarea se le fue y se queda
     // mostrandola de mas hasta que refresque a mano.
-    private Task NotificarCambio(TaskItem task, TaskItemDto dto, Guid? avisarTambienA = null)
+    private Task NotificarCambio(TaskItem task, TaskItemDto dto, string? avisarTambienA = null)
     {
         var grupos = new HashSet<string>();
 
@@ -45,14 +45,14 @@ public class TasksController : ControllerBase
 
         grupos.Add(TaskHubGroups.User(task.CreatedById));
 
-        if (task.AssignedToId.HasValue)
+        if (task.AssignedToId is not null)
         {
-            grupos.Add(TaskHubGroups.User(task.AssignedToId.Value));
+            grupos.Add(TaskHubGroups.User(task.AssignedToId));
         }
 
-        if (avisarTambienA.HasValue)
+        if (avisarTambienA is not null)
         {
-            grupos.Add(TaskHubGroups.User(avisarTambienA.Value));
+            grupos.Add(TaskHubGroups.User(avisarTambienA));
         }
 
         return Task.WhenAll(grupos.Select(g => _hub.Clients.Group(g).SendAsync("TaskChanged", dto)));
@@ -134,6 +134,9 @@ public class TasksController : ControllerBase
         var creator = await _db.Users.FindAsync(userId);
         if (creator is null) return BadRequest("Usuario no registrado.");
 
+        // ver comentario en User.Id
+        var assignedToId = dto.AssignedToId?.ToLowerInvariant();
+
         Guid? projectId = dto.ProjectId;
         int areaId;
 
@@ -179,9 +182,9 @@ public class TasksController : ControllerBase
             areaId = creator.AreaId;
         }
 
-        if (dto.AssignedToId.HasValue)
+        if (assignedToId is not null)
         {
-            var assignee = await _db.Users.FindAsync(dto.AssignedToId.Value);
+            var assignee = await _db.Users.FindAsync(assignedToId);
             if (assignee is null || assignee.AreaId != areaId)
                 return BadRequest("El usuario asignado debe pertenecer a la misma area.");
         }
@@ -195,9 +198,9 @@ public class TasksController : ControllerBase
             Description = dto.Description,
             AreaId = areaId,
             CreatedById = userId,
-            AssignedToId = dto.AssignedToId,
-            Status = dto.AssignedToId.HasValue ? TaskItemStatus.Asignada : TaskItemStatus.Creada,
-            FechaAsignacion = dto.AssignedToId.HasValue ? DateTime.UtcNow : null,
+            AssignedToId = assignedToId,
+            Status = assignedToId is not null ? TaskItemStatus.Asignada : TaskItemStatus.Creada,
+            FechaAsignacion = assignedToId is not null ? DateTime.UtcNow : null,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
@@ -313,7 +316,7 @@ public class TasksController : ControllerBase
     // UpdateStatus, MarkRead y UpdateAssignee (las transiciones
     // automaticas Asignada/Creada tambien quedan en TaskStatusHistory,
     // no solo las manuales).
-    private void CambiarEstado(TaskItem task, Guid userId, TaskItemStatus nuevo)
+    private void CambiarEstado(TaskItem task, string userId, TaskItemStatus nuevo)
     {
         var anterior = task.Status;
         task.Status = nuevo;
@@ -374,6 +377,7 @@ public class TasksController : ControllerBase
     public async Task<ActionResult<TaskItemDto>> UpdateAssignee(Guid id, UpdateTaskAssigneeDto dto)
     {
         var userId = GetUserIdFromToken();
+        var assignedToId = dto.AssignedToId?.ToLowerInvariant(); // ver comentario en User.Id
 
         var task = await _db.Tasks
             .Include(t => t.Project)
@@ -396,21 +400,21 @@ public class TasksController : ControllerBase
             return Forbid();
         }
 
-        if (dto.AssignedToId.HasValue)
+        if (assignedToId is not null)
         {
-            var assignee = await _db.Users.FindAsync(dto.AssignedToId.Value);
+            var assignee = await _db.Users.FindAsync(assignedToId);
             if (assignee is null || assignee.AreaId != task.AreaId)
                 return BadRequest("El usuario asignado debe pertenecer a la misma area.");
         }
 
         var asignadoAnterior = task.AssignedToId;
-        var assigneeCambio = task.AssignedToId != dto.AssignedToId;
+        var assigneeCambio = task.AssignedToId != assignedToId;
         var esEstadoCerrado = task.Status == TaskItemStatus.Terminada || task.Status == TaskItemStatus.Cancelada;
 
-        task.AssignedToId = dto.AssignedToId;
+        task.AssignedToId = assignedToId;
         task.UpdatedAt = DateTime.UtcNow;
 
-        if (dto.AssignedToId.HasValue)
+        if (assignedToId is not null)
         {
             task.FechaAsignacion = DateTime.UtcNow;
 
@@ -443,7 +447,7 @@ public class TasksController : ControllerBase
             .FirstAsync(t => t.Id == task.Id);
 
         var resultDto = ToDto(full);
-        var avisarAsignadoAnterior = assigneeCambio && asignadoAnterior.HasValue ? asignadoAnterior : null;
+        var avisarAsignadoAnterior = assigneeCambio && asignadoAnterior is not null ? asignadoAnterior : null;
         await NotificarCambio(full, resultDto, avisarAsignadoAnterior);
 
         return Ok(resultDto);
@@ -520,11 +524,12 @@ public class TasksController : ControllerBase
         (subtasks ?? Array.Empty<TaskItem>()).Select(s => ToDto(s)).ToList()
     );
 
-    private Guid GetUserIdFromToken()
+    private string GetUserIdFromToken()
     {
         var sub = User.FindFirst("sub")?.Value
             ?? throw new InvalidOperationException("Token sin claim 'sub'.");
 
-        return Guid.Parse(sub);
+        // Normalizado a minusculas - ver comentario en User.Id.
+        return sub.ToLowerInvariant();
     }
 }

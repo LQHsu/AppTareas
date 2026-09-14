@@ -42,9 +42,10 @@ public class AdminController : ControllerBase
     // PATCH /api/admin/users/{id}/super-admin
     // No se puede uno mismo quitar el flag si es el unico super admin
     // que queda (evita dejar el panel sin nadie que pueda entrar).
-    [HttpPatch("users/{id:guid}/super-admin")]
-    public async Task<ActionResult<UserDto>> UpdateSuperAdmin(Guid id, UpdateSuperAdminDto dto)
+    [HttpPatch("users/{id}/super-admin")]
+    public async Task<ActionResult<UserDto>> UpdateSuperAdmin(string id, UpdateSuperAdminDto dto)
     {
+        id = id.ToLowerInvariant(); // ver comentario en User.Id
         var callerId = GetUserIdFromToken();
         if (!await IsSuperAdmin(callerId)) return Forbid();
 
@@ -70,9 +71,10 @@ public class AdminController : ControllerBase
     // desde aca); lo que corta las peticiones es BanCheckMiddleware, que
     // revisa este flag en cada request autenticado. No te puedes banear
     // a ti mismo (te dejaria sin forma de deshacerlo salvo por SQL).
-    [HttpPatch("users/{id:guid}/ban")]
-    public async Task<ActionResult<UserDto>> UpdateBanned(Guid id, UpdateBannedDto dto)
+    [HttpPatch("users/{id}/ban")]
+    public async Task<ActionResult<UserDto>> UpdateBanned(string id, UpdateBannedDto dto)
     {
+        id = id.ToLowerInvariant(); // ver comentario en User.Id
         var callerId = GetUserIdFromToken();
         if (!await IsSuperAdmin(callerId)) return Forbid();
 
@@ -118,16 +120,17 @@ public class AdminController : ControllerBase
         return Ok(projects);
     }
 
-    private async Task<bool> IsSuperAdmin(Guid userId)
+    private async Task<bool> IsSuperAdmin(string userId)
     {
         return await _db.Users.AnyAsync(u => u.Id == userId && u.IsSuperAdmin);
     }
 
-    private Guid GetUserIdFromToken()
+    private string GetUserIdFromToken()
     {
         var sub = User.FindFirst("sub")?.Value
             ?? throw new InvalidOperationException("Token sin claim 'sub'.");
 
-        return Guid.Parse(sub);
+        // Normalizado a minusculas - ver comentario en User.Id.
+        return sub.ToLowerInvariant();
     }
 }

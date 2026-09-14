@@ -14,5 +14,5 @@ public static class TaskHubGroups
     // (ver TaskHub.OnConnectedAsync). Cubre "Mis tareas" -que mezcla
     // tareas de varios proyectos y tareas sueltas- sin tener que unirse
     // a un grupo por cada proyecto donde tenga algo asignado.
-    public static string User(Guid userId) => $"user:{userId}";
+    public static string User(string userId) => $"user:{userId}";
 }

@@ -5,9 +5,9 @@ import { environment } from '../../../environments/environment';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private keycloak = new Keycloak({
-    url: 'https://appcafeteria.xoc.uam.mx/auth-server',
-    realm: 'cafeteria-uam',
-    clientId: 'task-manager-uamx',
+    url: environment.keycloak.url,
+    realm: environment.keycloak.realm,
+    clientId: environment.keycloak.clientId,
   });
 
   // Token falso en base64, consumido por MockAuthHandler en el backend

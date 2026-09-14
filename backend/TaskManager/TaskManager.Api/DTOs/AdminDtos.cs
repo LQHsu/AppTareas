@@ -13,7 +13,7 @@ public record AdminProjectDto(
     string? Description,
     int AreaId,
     string AreaNombre,
-    Guid OwnerId,
+    string OwnerId,
     string OwnerFullName,
     bool IsArchived,
     DateTime CreatedAt,

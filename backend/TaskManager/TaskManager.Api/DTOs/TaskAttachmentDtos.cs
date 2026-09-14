@@ -6,7 +6,7 @@ public record TaskAttachmentDto(
     string FileName,
     string ContentType,
     long FileSizeBytes,
-    Guid UploadedById,
+    string UploadedById,
     string UploadedByFullName,
     DateTime UploadedAt
 );
@@ -22,7 +22,7 @@ public record ProjectAttachmentDto(
     string FileName,
     string ContentType,
     long FileSizeBytes,
-    Guid UploadedById,
+    string UploadedById,
     string UploadedByFullName,
     DateTime UploadedAt
 );

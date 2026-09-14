@@ -12,7 +12,7 @@ public class Project
     public int AreaId { get; set; }
     public Area Area { get; set; } = null!;
  
-    public Guid OwnerId { get; set; }
+    public string OwnerId { get; set; } = string.Empty;
     public User Owner { get; set; } = null!;
  
     // Carpeta en la que esta el proyecto (null = sin carpeta). Es una

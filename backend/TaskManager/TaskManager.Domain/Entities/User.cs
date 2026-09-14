@@ -2,8 +2,14 @@ namespace TaskManager.Domain.Entities;
  
 public class User
 {
-    // Debe coincidir con el "sub" (subject) del token JWT emitido por Keycloak
-    public Guid Id { get; set; }
+    // Debe coincidir con el "sub" (subject) del token JWT emitido por
+    // Keycloak - string, no Guid: para un usuario federado (ver
+    // CusxacdiUserStorageProvider en docker/keycloak/) Keycloak arma un
+    // "sub" compuesto tipo "f:<uuid-del-provider>:<matricula>", no un GUID
+    // puro. Normalizado siempre a minusculas por GetUserIdFromToken() en
+    // cada controller, para que las comparaciones "==" no dependan de que
+    // el token mande el mismo casing cada vez.
+    public string Id { get; set; } = string.Empty;
  
     public string Username { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;

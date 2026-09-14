@@ -12,7 +12,7 @@ public class TaskAttachment
     public string ContentType { get; set; } = string.Empty;
     public long FileSizeBytes { get; set; }
  
-    public Guid UploadedById { get; set; }
+    public string UploadedById { get; set; } = string.Empty;
     public User UploadedBy { get; set; } = null!;
  
     public DateTime UploadedAt { get; set; }
