@@ -59,11 +59,40 @@ export class CompletarRegistroComponent implements OnInit {
       next: (areas) => {
         this.areas.set(areas);
         this.loadingAreas.set(false);
+        this.preseleccionarAreaInstitucional(areas);
       },
       error: () => {
         this.errorMessage.set('No se pudo cargar el catálogo de áreas. Intenta recargar la página.');
         this.loadingAreas.set(false);
       },
+    });
+  }
+
+  // El claim "area" del token (resuelto por el SPI de Keycloak desde la
+  // BD institucional, ver docker/keycloak/README.md) es texto libre, no
+  // un Area.Id local - se resuelve/crea via /api/areas/resolve (busca por
+  // nombre exacto, la crea si es la primera vez que aparece esa area) y
+  // se preselecciona en el form. Si el token no trae "area" (usuario sin
+  // registro institucional, o area no resuelta), el usuario elige a mano
+  // como ya funcionaba antes de esto - no se fuerza nada.
+  private preseleccionarAreaInstitucional(areasCargadas: AreaDto[]): void {
+    const nombreInstitucional = this.auth.getArea();
+    if (!nombreInstitucional) return;
+
+    const yaExiste = areasCargadas.find((a) => a.nombre === nombreInstitucional);
+    if (yaExiste) {
+      this.form.patchValue({ areaId: yaExiste.id });
+      return;
+    }
+
+    this.areaService.resolve(nombreInstitucional).subscribe({
+      next: (area) => {
+        this.areas.update((actuales) => [...actuales, area].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        this.form.patchValue({ areaId: area.id });
+      },
+      // Si falla, el usuario simplemente elige a mano - no es un error
+      // que deba interrumpir el flujo de registro.
+      error: () => {},
     });
   }
 

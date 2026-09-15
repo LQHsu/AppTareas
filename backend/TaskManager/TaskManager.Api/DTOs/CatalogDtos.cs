@@ -2,6 +2,8 @@ namespace TaskManager.Api.DTOs;
 
 public record AreaDto(int Id, string Nombre);
 
+public record ResolveAreaDto(string Nombre);
+
 public record UserDto(
     string Id,
     string Username,

@@ -38,19 +38,21 @@ import org.keycloak.storage.adapter.AbstractUserAdapterFederatedStorage;
  * setUsername() en este provider), nunca se le hace setSingleAttribute
  * con la key USERNAME.
  *
- * PENDIENTE (Fase 3.2, requiere credenciales de info_usuarios_unidad):
- * setEmailVerified()/atributo EMAIL_ATTRIBUTE y el atributo "area" deben
- * poblarse aqui con un SELECT a esa BD por matricula. Mientras tanto el
- * correo queda vacio - el Audience Mapper y el login en si YA funcionan
- * sin esto, pero el frontend de AppTareas no podra autocompletar
- * correo/area en completar-registro hasta que se resuelva.
+ * Fase 3.2: correo y area vienen de info_usuarios_unidad (MySQL, ver
+ * InfoUsuariosUnidadClient) por numero economico/matricula - CUSXACDI no
+ * expone ninguno de los dos. El area queda como atributo custom "area"
+ * (no hay concepto nativo de "area" en UserModel) - el Protocol Mapper
+ * del realm lo expone como claim en el token; el backend .NET la
+ * resuelve/crea en su tabla local Area por nombre (no hay Area.Id aqui,
+ * los IDs son propios de AppTareas).
  */
 public class CusxacdiUserAdapter extends AbstractUserAdapterFederatedStorage {
 
     private final String username;
 
     public CusxacdiUserAdapter(KeycloakSession session, RealmModel realm, ComponentModel model,
-                                String username, CusxacdiClient cusxacdi) {
+                                String username, CusxacdiClient cusxacdi,
+                                InfoUsuariosUnidadClient infoUsuariosUnidad) {
         super(session, realm, model);
         this.username = username;
 
@@ -62,9 +64,21 @@ public class CusxacdiUserAdapter extends AbstractUserAdapterFederatedStorage {
             setEnabled(cuentaInfo.habilitada());
         }
 
-        // TODO Fase 3.2: SELECT correo/area a info_usuarios_unidad (MySQL,
-        // 148.206.99.178) por "username" y setSingleAttribute(UserModel.EMAIL, ...) /
-        // setSingleAttribute("area", ...) aqui.
+        // Sin fallback a un email inventado: si info_usuarios_unidad no
+        // tiene el dato (no configurado, matricula sin registro ahi,
+        // BD caida), el atributo simplemente no se setea y
+        // completar-registro en el frontend lo deja vacio para captura
+        // manual, como ya hacia antes de esto.
+        InfoUsuariosUnidadClient.DatosInstitucionales datos = infoUsuariosUnidad.buscar(username);
+        if (datos != null) {
+            if (datos.email() != null && !datos.email().isBlank()) {
+                setSingleAttribute(UserModel.EMAIL, datos.email());
+                setEmailVerified(true);
+            }
+            if (datos.area() != null && !datos.area().isBlank()) {
+                setSingleAttribute("area", datos.area());
+            }
+        }
     }
 
     @Override

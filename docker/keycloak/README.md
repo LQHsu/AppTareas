@@ -109,23 +109,51 @@ management mientras Keycloak ya está corriendo en el mismo contenedor; el
 export en sí ya terminó antes de eso, ver el log "Export finished
 successfully".)
 
-**Paso obligatorio antes de commitear**: `kc.sh export` incluye por
-default las **claves criptográficas reales del realm** (firma JWT,
-encriptación) en `components."org.keycloak.keys.KeyProvider"` — con eso
-se pueden falsificar tokens válidos. Hay que quitar ese bloque a mano:
+**Paso obligatorio antes de commitear** — `kc.sh export` mete dos tipos de
+secretos reales en el JSON, hay que quitar ambos:
+
+1. Las **claves criptográficas del realm** (firma JWT, encriptación) en
+   `components."org.keycloak.keys.KeyProvider"` — con eso se pueden
+   falsificar tokens válidos.
+2. Las **credenciales de MySQL del provider `cusxacdi-uamx`**
+   (`mysqlJdbcUrl`/`mysqlUser`/`mysqlPassword`) — pese a que el campo
+   `mysqlPassword` está declarado como `PASSWORD` type en la Admin
+   Console, el export las saca en texto plano igual (confirmado
+   directamente en el JSON, no asumido) — Keycloak no las vault-ea salvo
+   que se registre explícitamente un vault provider, que este stack no
+   tiene.
 
 ```js
 node -e "
 const fs = require('fs');
 const path = 'import/apptareas-realm.json';
 const data = JSON.parse(fs.readFileSync(path, 'utf-8'));
+
 delete (data.components || {})['org.keycloak.keys.KeyProvider'];
+
+function stripSecrets(obj) {
+  if (Array.isArray(obj)) { obj.forEach(stripSecrets); return; }
+  if (obj && typeof obj === 'object') {
+    for (const key of Object.keys(obj)) {
+      if (key === 'mysqlPassword' || key === 'mysqlUser' || key === 'mysqlJdbcUrl') {
+        delete obj[key];
+        continue;
+      }
+      stripSecrets(obj[key]);
+    }
+  }
+}
+stripSecrets(data);
+
 fs.writeFileSync(path, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 "
 ```
 
-Un Keycloak nuevo que importe este archivo sin ese bloque genera sus
-propias claves automáticamente — no hace falta reponerlas.
+Un Keycloak nuevo que importe este archivo sin las claves genera las
+suyas propias automáticamente. Las credenciales de MySQL sí hay que
+volver a ponerlas a mano desde la Admin Console tras un import limpio
+(User federation → cusxacdi-uamx) — no hay forma de que se auto-generen,
+son datos reales de otra parte.
 
 ## Fase 3.1 — hecho (autenticación via CUSXACDI)
 
@@ -187,17 +215,96 @@ Authentication → Required Actions para no estorbar mientras se prueba;
 debería dejar de aparecer solo una vez que el email real se puebla desde
 `info_usuarios_unidad`. Reevaluar si reactivarlo antes de producción.
 
-## Siguiente paso (Fase 3.2 — correo y área desde MySQL)
+## Fase 3.2 — hecho (correo y área desde MySQL)
 
-`CusxacdiUserAdapter` ya tiene el punto marcado con `TODO Fase 3.2`: un
-`SELECT` a `info_usuarios_unidad` (MySQL, `148.206.99.178`) por matrícula,
-para poblar `UserModel.EMAIL` y un atributo `area` (vía
-`setSingleAttribute`, mismo patrón que nombres/apellidos). Pendiente
-credenciales de esa BD (usuario/password aparte de lo que ya está en el
-`.env` de este stack — la que se compartió en el chat ya se marcó para
-rotar).
+`InfoUsuariosUnidadClient` consulta `info_usuarios_unidad` (MySQL,
+`148.206.99.178`) por número económico/matrícula. Esquema real (sin FKs
+declaradas — MyISAM ni las soporta):
 
-Después de eso: Protocol Mapper (config, no código) para exponer el
-atributo `area` como claim custom en el token de `task-manager-uamx`, y
-el theme custom de login (relabelar "Username"/"Password" a "Matrícula o
-número económico"/"NIP").
+- **Correo**: tabla `CE_Correo_Empleados` (`CE_NumEconomico` → `CE_Email`).
+  No está en `Empleados`/`Adscripciones`, hay que tener el `GRANT` sobre
+  esa tabla específica además de las otras dos.
+- **Área**: `Empleados.Pagaduria` == `Adscripciones.ClaveAdscripcion` (no
+  es una FK declarada, pero el valor coincide 1:1 — confirmado con datos
+  reales). Se usa `NombreAdscripcion2` (nivel intermedio de la jerarquía
+  de 3 niveles: Secretaría → *esta* → Oficina puntual).
+
+Config del provider (Admin Console → User federation → cusxacdi-uamx →
+campos `MySQL JDBC URL`/`Usuario`/`Password`, ej.
+`jdbc:mysql://148.206.99.178:3306/info_usuarios_unidad`) — nunca
+hardcodeado en el jar. Si no está configurado o la consulta falla, el
+login sigue funcionando igual (solo CUSXACDI es crítico) y
+completar-registro cae al comportamiento de "el usuario llena a mano".
+
+**Protocol Mapper**: `Clients → task-manager-uamx → Client scopes →
+task-manager-uamx-dedicated → Mappers`, tipo **User Attribute**, User
+Attribute=`area`, Token Claim Name=`area`, agregado a ID/access
+token/userinfo. Expone el atributo custom como claim `area` en el JWT.
+
+**Gotcha real (doble mojibake, dos causas distintas)**: nombres con
+acentos salían corruptos (`QUIÑONES` → `QUIÃONES`) desde dos fuentes
+separadas, cada una necesitó su propio fix:
+
+- **CUSXACDI (SOAP)**: el servidor *miente* en su propio
+  `Content-Type: charset=ISO-8859-1` (y el WSDL también lo declara así) —
+  confirmado inspeccionando los *bytes crudos* de la respuesta con
+  `curl`: `Ñ` llega como `C3 91`, que es UTF-8, no ISO-8859-1. Fix:
+  `CusxacdiClient` fuerza `HttpResponse.BodyHandlers.ofString(UTF_8)`
+  explícito, ignorando lo que el servidor declare.
+- **MySQL**: el servidor tiene `character_set_client`/`connection`/
+  `results` en `latin1` por default (`character_set_database` sí es
+  `utf8`) — los datos están en UTF-8 dentro de la BD pero MySQL los sirve
+  mal-decodificados si la sesión no pide `utf8` explícitamente. Fix:
+  `InfoUsuariosUnidadClient` agrega `useUnicode=true&characterEncoding=UTF-8`
+  a la URL JDBC.
+
+Si aparece mojibake nuevo en cualquier dato institucional, **revisar
+bytes crudos con curl/hexdump antes de asumir la causa** — ninguna de las
+dos veces el header/WSDL declarado coincidía con la realidad.
+
+**Sincronización de `Area` (backend .NET)**: el claim `area` es texto
+libre (nombre institucional), no un `Area.Id` local. `POST
+/api/areas/resolve` (`AreasController`) busca por nombre exacto y crea la
+fila si no existe — sincronización *perezosa*: no hay job ni catálogo
+pre-poblado, cada área nueva se crea sola la primera vez que alguien de
+ahí se registra. Requirió agregar índice único en `Area.Nombre`
+(migración `AgregarIndiceUnicoAreaNombre`) para poder detectar una
+carrera de creación concurrente. El frontend (`completar-registro`)
+llama esto al cargar, con el nombre que trae `AuthService.getArea()`, y
+preselecciona el área resultante — si el token no trae `area`, el
+usuario elige a mano como antes.
+
+## Fase 6 — hecho (corte a producción, `apptareas.xoc.uam.mx`)
+
+- `docker-compose.yml`: `command: start` (no `start-dev`),
+  `KC_HTTP_RELATIVE_PATH=/auth-server` (mismo path que usaba el Keycloak
+  compartido), `KC_PROXY_HEADERS=xforwarded` (Apache ya termina TLS).
+- `.env`: `KC_HOSTNAME=apptareas.xoc.uam.mx` — **rompe el login local**
+  (`localhost:4200`) mientras esté así; regresarlo a `localhost` +
+  reiniciar el contenedor para volver a developer en local.
+- Apache (`C:/Apache24/conf/extra/httpd-vhosts.conf`, vhost `:443` de
+  `apptareas.xoc.uam.mx`): `ProxyPass /auth-server` hacia
+  `localhost:8080/auth-server`, más `RequestHeader set
+  X-Forwarded-Proto "https"` explícito — `mod_proxy` manda
+  `X-Forwarded-For/-Host/-Server` solo, pero NO `-Proto`, y sin eso
+  Keycloak (con `KC_PROXY_HEADERS=xforwarded`) ve la conexión interna
+  como HTTP plano y rechaza.
+- **Admin Console en producción**: `https://apptareas.xoc.uam.mx/auth-server/admin/master/console/`
+  (sin puerto — `8080` solo existe en `localhost` del servidor, nunca
+  expuesto público).
+- **Gotcha real**: un `UPDATE` directo en la BD de Keycloak (Postgres) no
+  se refleja hasta reiniciar el contenedor — Keycloak cachea el modelo
+  del realm en memoria (Infinispan). Pasó al corregir a mano un
+  `redirect_uri`/`web_origin` que quedaron en `http://` en vez de
+  `https://`: el `UPDATE` SQL fue correcto pero el login siguió fallando
+  con `400 Invalid parameter: redirect_uri` hasta el `docker compose
+  restart keycloak`.
+- **Bloqueador externo activo**: el certificado TLS wildcard
+  (`*.xoc.uam.mx`, `C:/Apache24/LlavesCertificados2/`) está **vencido**
+  (venció 2026-05-19). El navegador puede tolerarlo, pero el
+  `HttpClient` interno de `JwtBearer` en el backend .NET lo rechaza al
+  descargar la metadata OIDC de Keycloak (`SEC_E_CERT_EXPIRED` /
+  `curl` sin `-k` da error 35) — todo endpoint `[Authorize]` responde
+  `401` aunque el token sea válido y el login en sí funcione. No se
+  puede resolver desde este proyecto; pendiente que renueven el
+  certificado institucional.

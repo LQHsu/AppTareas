@@ -82,4 +82,13 @@ export class AuthService {
   getFullName(): string | undefined {
     return environment.useMockAuth ? environment.mockUser.name : this.keycloak.tokenParsed?.['name'];
   }
+
+  // Claim custom "area" (Protocol Mapper del realm apptareas), resuelto
+  // por el SPI de Keycloak desde info_usuarios_unidad - ver
+  // docker/keycloak/README.md. undefined si Keycloak no pudo resolverla
+  // (matricula sin registro institucional, BD caida) - completar-registro
+  // cae al comportamiento anterior (el usuario elige a mano) en ese caso.
+  getArea(): string | undefined {
+    return environment.useMockAuth ? undefined : this.keycloak.tokenParsed?.['area'];
+  }
 }

@@ -39,6 +39,14 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<TaskItem>().Property(t => t.AssignedToId).HasMaxLength(UserIdMaxLength);
         modelBuilder.Entity<TaskStatusHistory>().Property(h => h.ChangedById).HasMaxLength(UserIdMaxLength);
 
+        // Nombre de Area unico: AreasController.Resolve (sincronizacion
+        // perezosa desde el claim "area" del token) depende de esto para
+        // detectar una carrera de creacion concurrente via
+        // DbUpdateException - sin el indice, dos requests simultaneas
+        // creando la misma area nueva generarian un duplicado silencioso
+        // en vez de que la segunda reconsulte y reuse la primera.
+        modelBuilder.Entity<Area>().HasIndex(a => a.Nombre).IsUnique();
+
         // Clave compuesta para la tabla intermedia Project <-> User
         modelBuilder.Entity<ProjectMember>()
             .HasKey(pm => new { pm.ProjectId, pm.UserId });

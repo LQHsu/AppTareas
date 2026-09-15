@@ -158,7 +158,16 @@ public class CusxacdiClient {
                 .POST(HttpRequest.BodyPublishers.ofString(body, java.nio.charset.StandardCharsets.UTF_8))
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        // GOTCHA REAL (confirmado inspeccionando los BYTES crudos de la
+        // respuesta con curl, no solo el header): el servidor de CUSXACDI
+        // miente en su propio Content-Type - dice "charset=ISO-8859-1"
+        // (y el WSDL tambien declara ISO-8859-1 en su XML declaration),
+        // pero los bytes reales para 'Ñ' son C3 91, que es UTF-8, no
+        // ISO-8859-1. Confiar en el header (o en el WSDL) corrompe todo
+        // nombre con acentos ("QUIÑONES" -> "QUIÃONES"). Se fuerza UTF-8
+        // sin importar lo que el servidor declare.
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString(java.nio.charset.StandardCharsets.UTF_8));
         if (response.statusCode() != 200) {
             throw new IOException("HTTP " + response.statusCode() + " de CUSXACDI");
         }

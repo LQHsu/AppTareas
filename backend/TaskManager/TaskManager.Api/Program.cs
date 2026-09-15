@@ -7,6 +7,17 @@ using TaskManager.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Producion corre como servicio de Windows (TaskManagerApi, ver
+// docker/keycloak/README.md... no, ver deploy en el servidor - sc.exe
+// create). Sin esto, dotnet.exe corre como consola normal y nunca le
+// avisa al Service Control Manager que arranco bien: el SCM espera el
+// protocolo de servicio y lo mata por timeout (confirmado: el servicio
+// quedaba "Stopped" sin ningun error en el Event Log, ni siquiera
+// llegaba a intentar bind). UseWindowsService() es un no-op inofensivo
+// cuando se corre fuera de un servicio (dotnet run, o el .dll a mano en
+// consola) - no hace falta condicionarlo por ambiente.
+builder.Host.UseWindowsService();
+
 // appsettings.Local.json: secretos reales de este entorno (connection
 // strings con password, etc.), NUNCA versionado (ver .gitignore). Prioridad
 // mas alta que appsettings.json/appsettings.{Environment}.json, asi que

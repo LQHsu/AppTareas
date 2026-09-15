@@ -3,6 +3,10 @@ backend/**/bin/
 backend/**/obj/
 backend/**/appsettings.Local.json
 backend/**/App_Data/
+# Output de "dotnet publish" para el servicio de Windows en produccion
+# (TaskManagerApi) - build artifact, se regenera con dotnet publish, no
+# se versiona (y ademas trae appsettings.Local.json real copiado adentro).
+backend/publish/
 
 # --- Frontend Angular (ver tambien frontend/task-manager-app/.gitignore,
 #     que sigue aplicando ademas de este) ---

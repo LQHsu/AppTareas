@@ -31,7 +31,7 @@
   "registrationEmailAsUsername": false,
   "rememberMe": false,
   "verifyEmail": false,
-  "loginWithEmailAllowed": true,
+  "loginWithEmailAllowed": false,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": false,
   "editUsernameAllowed": false,
@@ -792,11 +792,11 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "http://apptareas.xoc.uam.mx/*",
-        "http://localhost:4200/*"
+        "http://localhost:4200/*",
+        "https://apptareas.xoc.uam.mx/*"
       ],
       "webOrigins": [
-        "http://apptareas.xoc.uam.mx",
+        "https://apptareas.xoc.uam.mx",
         "http://localhost:4200"
       ],
       "notBefore": 0,
@@ -821,6 +821,23 @@
       "fullScopeAllowed": true,
       "nodeReRegistrationTimeout": -1,
       "protocolMappers": [
+        {
+          "id": "c512ec66-a133-424b-bd7f-a090ff115c49",
+          "name": "area",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "user.attribute": "area",
+            "id.token.claim": "true",
+            "lightweight.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "area",
+            "jsonType.label": "String"
+          }
+        },
         {
           "id": "026fb748-3da4-482d-89ca-27361323e181",
           "name": "audience-task-manager-uamx",
@@ -2135,7 +2152,7 @@
         {
           "authenticator": "registration-page-form",
           "authenticatorFlow": true,
-          "requirement": "DISABLED",
+          "requirement": "REQUIRED",
           "priority": 10,
           "autheticatorFlow": true,
           "flowAlias": "registration form",
@@ -2285,7 +2302,7 @@
       "alias": "UPDATE_PASSWORD",
       "name": "Update Password",
       "providerId": "UPDATE_PASSWORD",
-      "enabled": true,
+      "enabled": false,
       "defaultAction": false,
       "priority": 30,
       "config": {}
@@ -2294,7 +2311,7 @@
       "alias": "UPDATE_PROFILE",
       "name": "Update Profile",
       "providerId": "UPDATE_PROFILE",
-      "enabled": true,
+      "enabled": false,
       "defaultAction": false,
       "priority": 40,
       "config": {}
@@ -2303,7 +2320,7 @@
       "alias": "VERIFY_EMAIL",
       "name": "Verify Email",
       "providerId": "VERIFY_EMAIL",
-      "enabled": true,
+      "enabled": false,
       "defaultAction": false,
       "priority": 50,
       "config": {}
@@ -2376,7 +2393,11 @@
     "cibaAuthRequestedUserHint": "login_hint",
     "oauth2DeviceCodeLifespan": "600",
     "oauth2DevicePollingInterval": "5",
+    "clientOfflineSessionMaxLifespan": "0",
+    "clientSessionIdleTimeout": "0",
     "parRequestUriLifespan": "60",
+    "clientSessionMaxLifespan": "0",
+    "clientOfflineSessionIdleTimeout": "0",
     "cibaInterval": "5",
     "realmReusableOtpCode": "false"
   },

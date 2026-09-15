@@ -26,9 +26,9 @@ import java.util.logging.Logger;
  * y correcto aqui porque CUSXACDI ya es la fuente de verdad completa -
  * no hace falta cachear nada localmente para que el login funcione.
  *
- * Correo/area (que CUSXACDI no expone) se completan aparte, ver
- * CusxacdiUserAdapter y el pendiente de la consulta a
- * info_usuarios_unidad (MySQL) documentado en el README.
+ * Correo/area (que CUSXACDI no expone) se completan aparte via
+ * info_usuarios_unidad (MySQL) - ver CusxacdiUserAdapter e
+ * InfoUsuariosUnidadClient.
  */
 public class CusxacdiUserStorageProvider implements
         UserStorageProvider,
@@ -40,11 +40,16 @@ public class CusxacdiUserStorageProvider implements
     private final KeycloakSession session;
     private final ComponentModel model;
     private final CusxacdiClient cusxacdi;
+    private final InfoUsuariosUnidadClient infoUsuariosUnidad;
 
     public CusxacdiUserStorageProvider(KeycloakSession session, ComponentModel model) {
         this.session = session;
         this.model = model;
         this.cusxacdi = new CusxacdiClient();
+        this.infoUsuariosUnidad = new InfoUsuariosUnidadClient(
+                model.get(CusxacdiUserStorageProviderFactory.CONFIG_MYSQL_JDBC_URL),
+                model.get(CusxacdiUserStorageProviderFactory.CONFIG_MYSQL_USER),
+                model.get(CusxacdiUserStorageProviderFactory.CONFIG_MYSQL_PASSWORD));
     }
 
     // -------------------------------------------------------------------
@@ -70,7 +75,7 @@ public class CusxacdiUserStorageProvider implements
         if (MatriculaUtil.esAlumno(username)) {
             return null;
         }
-        return new CusxacdiUserAdapter(session, realm, model, username, cusxacdi);
+        return new CusxacdiUserAdapter(session, realm, model, username, cusxacdi, infoUsuariosUnidad);
     }
 
     @Override
