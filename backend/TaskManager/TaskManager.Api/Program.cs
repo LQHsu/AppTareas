@@ -1,4 +1,6 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.Auth;
 using TaskManager.Api.Hubs;
@@ -87,6 +89,34 @@ else
 builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 
+// --- Rate limiting ---
+// No habia ningun limite de tasa (ni aqui, ni en Apache, ni en
+// Keycloak) - un token valido podia golpear cualquier endpoint sin
+// freno. Particionado por usuario ("sub" del JWT) en vez de solo por IP:
+// varios usuarios de la UAM pueden salir detras de la misma IP de
+// campus, y particionar solo por IP los penalizaria a todos por igual.
+// Cae a IP unicamente para requests sin token valido (de todas formas
+// van a terminar en 401 antes de tocar la BD, pero igual conviene
+// limitarlos - evita gastar ciclos validando JWT en un loop).
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var key = httpContext.User.FindFirst("sub")?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 200,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        });
+    });
+});
+
 // --- CORS para el frontend Angular ---
 builder.Services.AddCors(options =>
 {
@@ -123,6 +153,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AngularApp");
 app.UseAuthentication();
+// Despues de UseAuthentication (para particionar por el "sub" real del
+// usuario) y antes de BanCheckMiddleware/UseAuthorization, asi un
+// usuario que se pasa del limite ni siquiera llega a tocar la BD.
+app.UseRateLimiter();
 app.UseMiddleware<BanCheckMiddleware>();
 app.UseAuthorization();
 app.MapControllers();

@@ -308,3 +308,47 @@ usuario elige a mano como antes.
   `401` aunque el token sea válido y el login en sí funcione. No se
   puede resolver desde este proyecto; pendiente que renueven el
   certificado institucional.
+
+## Protección contra fuerza bruta (2026-09-18)
+
+El NIP institucional son 5 dígitos (100,000 combinaciones) — un espacio
+de búsqueda chico para un script sin freno. El realm traía
+`bruteForceProtected: false` por default (Keycloak no lo activa solo al
+crear un realm nuevo). Se activó vía la API de administración (más
+confiable que un `UPDATE` directo en la BD — Keycloak cachea el modelo
+del realm en memoria/Infinispan y un `UPDATE` en SQL no se refleja hasta
+reiniciar el contenedor, ya nos pasó antes con `redirect_uri`):
+
+- `bruteForceProtected: true`
+- `failureFactor: 5` (default de Keycloak es 30 — demasiado permisivo
+  para un PIN de 5 dígitos)
+- El resto de los tiempos se dejó en su default (`waitIncrementSeconds:
+  60`, `maxFailureWaitSeconds: 900`, detección de ráfaga a 1
+  intento/segundo) — ya son razonables.
+- **`permanentLockout` se dejó en `false` a propósito**: un bloqueo
+  permanente abriría una puerta para que cualquiera deje bloqueado a un
+  trabajador real con solo 5 intentos fallidos deliberados (DoS trivial
+  contra otra persona). Con bloqueo temporal, la cuenta legítima se
+  recupera sola en minutos.
+
+**Confirmado funcionando con nuestro SPI custom** (importante, porque el
+usuario nunca se persiste en la tabla local de Keycloak — ver
+`CusxacdiUserStorageProvider`): la tabla `username_login_failure` que
+trackea los fallos está indexada por `realm_id + username` (texto
+plano), no por el ID interno de Keycloak — es independiente del
+mecanismo de federación. Probado en vivo: 6 intentos con NIP incorrecto
+seguidos dejaron la cuenta con `"disabled": true`
+(`GET /admin/realms/apptareas/attack-detection/brute-force/users/{id}`),
+pese a que `numFailures` mostraba solo 2 — se disparó por la detección
+de ráfaga (`quickLoginCheckMilliSeconds`), no por alcanzar
+`failureFactor`, que es justo el camino más relevante contra un bot real
+(bloquea casi de inmediato, no espera a acumular 5 fallos espaciados).
+El mensaje de error del token endpoint sigue siendo el genérico
+`"Invalid user credentials"` incluso con la cuenta bloqueada — intencional,
+evita que un atacante distinga "NIP incorrecto" de "cuenta bloqueada".
+
+Para desbloquear una cuenta a mano (dev/soporte):
+```bash
+DELETE /admin/realms/apptareas/attack-detection/brute-force/users/{userId}
+```
+(con un token de admin — `userId` es el mismo id compuesto `f:...:matricula`).
