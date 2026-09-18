@@ -107,8 +107,11 @@ export class AppShellComponent implements OnInit {
   loadProjects(): void {
     this.loadingProjects.set(true);
     this.projectService.getMine().subscribe({
+      // El backend ya devuelve ordenado por CreatedAt desc (ver
+      // ProjectsController.GetMine) - igual que recentTasks, el panel
+      // expandido solo muestra los primeros 5, no la lista completa.
       next: (projects) => {
-        this.projects.set(projects);
+        this.projects.set(projects.slice(0, 5));
         this.loadingProjects.set(false);
       },
       error: () => this.loadingProjects.set(false),

@@ -12,20 +12,6 @@
 
     <nav class="shell-links">
       <a
-        routerLink="/proyectos"
-        routerLinkActive="shell-link--active"
-        class="shell-link"
-        matTooltip="Proyectos"
-        [matTooltipDisabled]="expanded()"
-        matTooltipPosition="right"
-      >
-        <mat-icon>space_dashboard</mat-icon>
-        @if (expanded()) {
-          <span>Proyectos</span>
-        }
-      </a>
-
-      <a
         routerLink="/carpetas"
         routerLinkActive="shell-link--active"
         class="shell-link"
@@ -36,6 +22,20 @@
         <mat-icon>folder</mat-icon>
         @if (expanded()) {
           <span>Carpetas</span>
+        }
+      </a>
+
+      <a
+        routerLink="/proyectos"
+        routerLinkActive="shell-link--active"
+        class="shell-link"
+        matTooltip="Proyectos"
+        [matTooltipDisabled]="expanded()"
+        matTooltipPosition="right"
+      >
+        <mat-icon>space_dashboard</mat-icon>
+        @if (expanded()) {
+          <span>Proyectos</span>
         }
       </a>
 
