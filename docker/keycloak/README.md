@@ -353,18 +353,34 @@ DELETE /admin/realms/apptareas/attack-detection/brute-force/users/{userId}
 ```
 (con un token de admin — `userId` es el mismo id compuesto `f:...:matricula`).
 
-**Corrección (2026-09-18)**: la nota de arriba decía que el mensaje de
-error del login nunca distingue "credenciales incorrectas" de "cuenta
-bloqueada", y que eso era intencional. Esa prueba se hizo contra el
-**endpoint de token directo** (`grant_type=password`, usado por APIs) —
-ese sí es genérico siempre, por especificación OAuth2, y **no pasa por
-temas ni por esta llave**. El **flujo de navegador real** sí usa una
-clave de mensaje distinta (`accountTemporarilyDisabledMessage`,
-confirmada en `theme/base/login/messages/messages_en.properties` del
-propio Keycloak) para cuenta bloqueada — no es una fuga de información
-nueva que estemos introduciendo, es como Keycloak ya se comporta de
-fábrica en el navegador. Se sobreescribió esa clave en el tema custom
-(ver abajo) con texto institucional.
+**Corrección de la corrección (2026-09-18)** — dejar esto documentado
+tal cual pasó, es fácil volver a perder tiempo en lo mismo: la nota
+original decía que el mensaje de login nunca distingue "credenciales
+incorrectas" de "cuenta bloqueada", intencional. Se "corrigió" esa nota
+pensando que el **flujo de navegador real** sí usa una clave distinta
+(`accountTemporarilyDisabledMessage`, que **sí existe** en
+`theme/base/login/messages/messages_en.properties` del propio
+Keycloak) — pero esa clave existir en el archivo de mensajes **no
+significa que este flujo la use**. Probado en vivo con curl replicando
+el POST real del formulario (manteniendo cookies, revisando el `HTTP
+200` sin `Location` para confirmar que ni con el NIP correcto se cuela
+el login estando bloqueada — no hay bug de seguridad ahí) contra una
+cuenta confirmada `"disabled": true` vía la API de attack-detection: el
+mensaje sigue siendo el genérico (`invalidUserMessage`) en los dos
+casos, sin excepción. La nota **original** era la correcta.
+
+Se intentó además sobreescribir `login.ftl` (forzando
+`displayMessage=true` en vez de la condición original que apaga el
+mensaje general cuando ya hay un error de campo) para que el mensaje
+general SÍ se mostrara — pero ese mensaje general nunca contiene el
+texto de `accountTemporarilyDisabledMessage`, sale exactamente el mismo
+texto genérico que el error de campo, así que el único efecto real del
+cambio era duplicar el mismo mensaje dos veces en un login fallido
+normal (no bloqueado). Se revirtió — el override no vale su costo.
+`accountTemporarilyDisabledMessage` se deja sobreescrita en
+`messages_es.properties` de todas formas (no hace daño si nunca se usa;
+si algún otro flujo la dispara algún día, ya tiene texto institucional
+listo), pero **no esperes verla en el login normal**.
 
 ## Tema de login custom (2026-09-18)
 
