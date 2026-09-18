@@ -68,6 +68,23 @@
           }
         </a>
       }
+
+      <!-- shell-link--logout: separado del resto de la nav con
+           margin-top: auto (ver .scss), queda pegado al fondo del
+           sidenav en vez de seguir el flujo normal de la lista. -->
+      <button
+        type="button"
+        (click)="logout()"
+        class="shell-link shell-link--logout"
+        matTooltip="Cerrar sesión"
+        [matTooltipDisabled]="expanded()"
+        matTooltipPosition="right"
+      >
+        <mat-icon>logout</mat-icon>
+        @if (expanded()) {
+          <span>Cerrar sesión</span>
+        }
+      </button>
     </nav>
 
     @if (expanded()) {

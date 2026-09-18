@@ -10,6 +10,7 @@ import { ProjectService, ProjectDto } from '../../../core/services/project.servi
 import { TaskService, TaskItemDto } from '../../../core/services/task.service';
 import { UserService } from '../../../core/services/user.service';
 import { RealtimeService } from '../../../core/services/realtime.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 // Layout persistente para toda la app autenticada (ver app.routes.ts:
 // envuelve proyectos/proyectos:id/mis-tareas/admin como hijos). Colapsado
@@ -50,7 +51,8 @@ export class AppShellComponent implements OnInit {
     private projectService: ProjectService,
     private taskService: TaskService,
     public userService: UserService,
-    private realtime: RealtimeService
+    private realtime: RealtimeService,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -76,6 +78,10 @@ export class AppShellComponent implements OnInit {
 
   toggleExpanded(): void {
     this.expanded.update((v) => !v);
+  }
+
+  logout(): void {
+    this.auth.logout();
   }
 
   loadProjects(): void {

@@ -65,6 +65,20 @@
   font-weight: 500;
 }
 
+// Es un <button>, no un <a> como el resto de .shell-link: resetea los
+// estilos nativos de boton para que se vea identico, y margin-top: auto
+// lo empuja al fondo del flex column .shell-links (separado del resto
+// de la navegacion, sin necesitar un contenedor aparte).
+.shell-link--logout {
+  margin-top: auto;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
 .shell-panel {
   margin-top: 16px;
   padding: 0 16px 16px;
