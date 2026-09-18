@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnInit, ViewChild, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs';
@@ -38,6 +38,13 @@ import { AuthService } from '../../../core/services/auth.service';
   styleUrl: './app-shell.component.scss',
 })
 export class AppShellComponent implements OnInit {
+  // Referencia especifica al <mat-sidenav>, no a todo el componente: el
+  // shell entero (incluido .shell-content, donde vive el router-outlet
+  // con toda la app) es un solo elemento raiz, asi que un ElementRef del
+  // componente contendria cualquier click de la pantalla - nunca se
+  // cerraria. Se necesita acotar el check al nodo real del sidenav.
+  @ViewChild('sidenavEl', { read: ElementRef }) sidenavEl!: ElementRef<HTMLElement>;
+
   expanded = signal(false);
 
   projects = signal<ProjectDto[]>([]);
@@ -78,6 +85,19 @@ export class AppShellComponent implements OnInit {
 
   toggleExpanded(): void {
     this.expanded.update((v) => !v);
+  }
+
+  // Cierra la sidebar expandida al hacer click fuera de ella. Escucha en
+  // el document (no solo dentro del sidenav) para detectar clicks en
+  // cualquier parte de la pantalla, incluido el contenido a la derecha
+  // (router-outlet). Si el click fue dentro del propio <mat-sidenav>
+  // (incluido su boton de toggle) no hace nada - evita que expandir y
+  // este listener se peleen en el mismo click.
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.expanded()) return;
+    if (this.sidenavEl?.nativeElement.contains(event.target as Node)) return;
+    this.expanded.set(false);
   }
 
   logout(): void {
