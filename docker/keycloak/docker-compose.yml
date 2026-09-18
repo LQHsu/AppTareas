@@ -56,6 +56,13 @@ services:
       - ./import:/opt/keycloak/data/import
       # SPI custom de LDAP+DB institucional (Fase 3). Vacio por ahora.
       - ./providers:/opt/keycloak/providers
+      # Tema custom de login (Fase 7) - archivos sueltos, a diferencia
+      # de providers/ NO necesita "kc.sh build": Keycloak los lee
+      # directo de esta carpeta (confirmado en el README que trae la
+      # propia imagen). En modo "start" (produccion) igual se cachean,
+      # asi que un cambio aqui necesita "docker compose restart
+      # keycloak" para verse - en start-dev ni eso haria falta.
+      - ./themes:/opt/keycloak/themes
     ports:
       # Solo localhost: nunca se expone directo a internet, va detras de
       # Apache como reverse proxy (mismo patron ya planeado para Kestrel).

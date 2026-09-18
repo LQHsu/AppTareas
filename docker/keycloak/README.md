@@ -352,3 +352,83 @@ Para desbloquear una cuenta a mano (dev/soporte):
 DELETE /admin/realms/apptareas/attack-detection/brute-force/users/{userId}
 ```
 (con un token de admin — `userId` es el mismo id compuesto `f:...:matricula`).
+
+**Corrección (2026-09-18)**: la nota de arriba decía que el mensaje de
+error del login nunca distingue "credenciales incorrectas" de "cuenta
+bloqueada", y que eso era intencional. Esa prueba se hizo contra el
+**endpoint de token directo** (`grant_type=password`, usado por APIs) —
+ese sí es genérico siempre, por especificación OAuth2, y **no pasa por
+temas ni por esta llave**. El **flujo de navegador real** sí usa una
+clave de mensaje distinta (`accountTemporarilyDisabledMessage`,
+confirmada en `theme/base/login/messages/messages_en.properties` del
+propio Keycloak) para cuenta bloqueada — no es una fuga de información
+nueva que estemos introduciendo, es como Keycloak ya se comporta de
+fábrica en el navegador. Se sobreescribió esa clave en el tema custom
+(ver abajo) con texto institucional.
+
+## Tema de login custom (2026-09-18)
+
+`docker/keycloak/themes/apptareas/login/` — archivos sueltos, **no** un
+`.jar` en `providers/`, así que a diferencia del SPI **no requiere
+`kc.sh build`**: Keycloak los lee directo de la carpeta montada. En modo
+`start` (producción) sí se cachean, así que un cambio necesita
+`docker compose restart keycloak` para verse (en `start-dev` ni eso).
+
+```
+themes/apptareas/login/
+  theme.properties          # parent=keycloak.v2, mas styles=/scripts=
+  messages/messages_es.properties
+  resources/css/login.css
+  resources/js/login.js
+```
+
+- **`parent=keycloak.v2`** hereda todo el layout/CSS/templates del tema
+  base real de esta versión (confirmado inspeccionando el jar
+  `org.keycloak.keycloak-themes-26.0.8.jar` que trae la propia imagen —
+  `keycloak.v2` es el default desde Keycloak 22+, no asumido de docs
+  viejas).
+- **Español completo**: el realm tenía `internationalizationEnabled:
+  false` — por eso *todo* el login estaba en inglés, no solo
+  "Username"/"Password". Se activó con `supportedLocales: ["es"]` +
+  `defaultLocale: "es"`; Keycloak ya trae una traducción base decente
+  (`theme/base/login/messages/messages_es.properties`), y
+  `messages_es.properties` de este tema solo sobreescribe las llaves que
+  de verdad cambian (`username`, `password`, `doLogIn`,
+  `invalidUserMessage`, `accountTemporarilyDisabledMessage`,
+  `loginAccountTitle`) — todo lo demás (registro, OTP, reset-password…)
+  sale en español sin tocar nada más.
+- **Paleta**: `login.css` sobreescribe los **tokens globales de
+  PatternFly v5** (`--pf-v5-global--primary-color--100/200`,
+  `--pf-v5-global--link--Color--dark`), no selectores de componente —
+  confirmado inspeccionando el CSS real que el botón primario y el
+  borde de foco de los inputs ya leen de esos mismos tokens. Es el
+  método de personalización que PatternFly espera; pelear con la
+  especificidad del CSS minificado ya nos costó tiempo una vez en este
+  proyecto (Tabulator, lado Angular) — no valía la pena repetirlo aquí.
+- **Placeholders / iconos en los labels / texto de ayuda / botón con
+  spinner / link externo de recuperación de NIP**: nada de esto tiene
+  parámetro en las macros base de Keycloak (`field.ftl` no soporta
+  `placeholder` ni iconos — confirmado leyendo el `.ftl` real). En vez
+  de sobreescribir `login.ftl`/`field.ftl` (compartidos con registro,
+  OTP, reset-password — tocar el macro global arriesgaba romper esos
+  otros flujos) todo se hizo con **DOM después del render**, vía
+  `login.js` referenciado desde `theme.properties` (`scripts=`, mismo
+  mecanismo que `styles=`, confirmado en `template.ftl`). Cero riesgo
+  para otros flujos porque ningún `.ftl` compartido se tocó.
+- **El toggle de mostrar/ocultar NIP ya viene incluido de fábrica** en
+  `@field.password` (`passwordVisibility.js` del tema base) — no hizo
+  falta escribir nada para eso.
+- **El link de recuperación de NIP** (`https://cus.xoc.uam.mx/`) se
+  agrega a mano porque `realm.resetPasswordAllowed` está en `false` a
+  propósito: nuestro SPI no puede actualizar el NIP (lo administra
+  CUSXACDI/CUS), así que el flujo nativo de "forgot password" de
+  Keycloak nunca aplicaría aquí.
+
+### Re-generar el tema tras un cambio
+
+```bash
+# Editar los archivos en docker/keycloak/themes/apptareas/login/
+cd docker/keycloak
+export MSYS_NO_PATHCONV=1
+docker compose restart keycloak   # suficiente - no requiere build
+```

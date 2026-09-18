@@ -1,0 +1,77 @@
+/* AppTareas: recolorea el acento del login de Keycloak con la misma
+ * paleta de la app (--app-blue en frontend/task-manager-app/src/
+ * styles.scss: #2E5966 / #274c57 / #F2F6FF).
+ *
+ * Se sobreescriben los TOKENS GLOBALES de PatternFly v5, no selectores
+ * de componente - confirmado inspeccionando el CSS real de este
+ * Keycloak (org.keycloak.keycloak-themes-26.0.8.jar) que el boton
+ * primario y el borde de foco de los inputs YA leen de estos mismos
+ * tokens (--pf-v5-c-button--m-primary--BackgroundColor:
+ * var(--pf-v5-global--primary-color--100), etc.) - es el metodo de
+ * personalizacion que PatternFly espera, evita pelear con la
+ * especificidad del CSS minificado (ya nos paso una vez en este mismo
+ * proyecto con el theme de Tabulator - no vale la pena repetirlo).
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+:root {
+  --pf-v5-global--primary-color--100: #2E5966;
+  --pf-v5-global--primary-color--200: #1B3941;
+  --pf-v5-global--link--Color--dark: #2E5966;
+  --pf-v5-global--link--Color--dark--hover: #1B3941;
+}
+
+body,
+.pf-v5-c-login,
+.pf-v5-c-form-control,
+.pf-v5-c-button {
+  font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+}
+
+/* #keycloak-bg es el id real del <body> (confirmado en template.ftl) -
+ * la tarjeta blanca del formulario ya tiene su propio fondo opaco
+ * (--pf-v5-c-login__main--BackgroundColor), asi que esto solo cambia
+ * el lienzo detras, sin ningun texto sentado directo encima. A
+ * proposito NO se toca el color del header (#kc-header-wrapper): en
+ * el tema base sale en blanco fijo con !important pensado para un
+ * fondo oscuro que este Keycloak no usa - cambiar el fondo sin
+ * verificar bien ese caso podia dejar texto blanco sobre blanco. */
+#keycloak-bg {
+  background-color: #F2F6FF;
+}
+
+/* Texto de ayuda que agrega login.js arriba del formulario. */
+.apptareas-login-hint {
+  color: #5B6472; /* --app-text-muted */
+  font-size: 0.875rem;
+  margin: 0 0 1rem;
+}
+
+/* Icono en cada label (login.js los inserta como <i>) - solo separa
+ * un poco del texto, el color/tamano ya los trae Font Awesome. */
+label .fas {
+  margin-right: 0.35rem;
+  color: #2E5966;
+}
+
+/* Spinner del boton "Acceder" mientras verifica - respeta
+ * prefers-reduced-motion, no gira si el usuario lo desactivo en su SO. */
+.apptareas-spinner {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: #fff;
+  border-radius: 50%;
+  vertical-align: -0.15em;
+  animation: apptareas-spin 0.7s linear infinite;
+}
+
+@keyframes apptareas-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .apptareas-spinner { animation: none; }
+}
