@@ -15,12 +15,14 @@ public record FolderDto(
     int TaskCount,
     // true si el usuario que consulta es el dueno (puede administrarla);
     // false si solo la ve porque se la compartieron.
-    bool IsOwner
+    bool IsOwner,
+    // Color elegido por el dueno (hex, ej. "#3B82F6"), null si no eligio.
+    string? Color
 );
 
-public record CreateFolderDto(string Name);
+public record CreateFolderDto(string Name, string? Color = null);
 
-public record UpdateFolderDto(string Name);
+public record UpdateFolderDto(string Name, string? Color = null);
 
 // UserId null = dejar de compartir (no reasigna nada, ver ShareFolder).
 public record ShareFolderDto(string? UserId);

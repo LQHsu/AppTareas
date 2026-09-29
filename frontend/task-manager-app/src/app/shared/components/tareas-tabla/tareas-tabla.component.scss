@@ -310,6 +310,49 @@
   line-height: 1.4;
 }
 
+// Punto de color de la columna Proyecto: color dinamico por fila (el
+// del proyecto de esa tarea), inyectado como "style" inline desde
+// formatProyecto ya que Tabulator renderiza fuera de Angular.
+::ng-deep .proyecto-celda {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+::ng-deep .proyecto-celda__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+
+// Iconos de adjuntos/comentarios (ver formatIndicadores). En tono
+// apagado a proposito: son una pista secundaria, no deben competir con
+// el titulo ni con el badge de estado.
+::ng-deep .indicadores {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+::ng-deep .indicador {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--app-text-muted);
+}
+
+// La fuente de Material Icons ya se carga global en index.html, asi que
+// un <span class="material-icons"> funciona dentro del HTML que inyecta
+// Tabulator (donde un <mat-icon> de Angular no se renderizaria).
+::ng-deep .indicador__icono {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
 ::ng-deep .badge-estado--creada {
   background: var(--estado-creada-soft);
   border-color: var(--estado-creada);

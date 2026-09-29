@@ -1,0 +1,125 @@
+.altas-page {
+  margin: 0 auto;
+  padding: 24px;
+}
+
+@media (min-width: 600px) {
+  .altas-page {
+    max-width: 80vw;
+  }
+}
+
+.altas-header {
+  margin-bottom: 20px;
+}
+
+.altas-header h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.altas-lede {
+  color: rgba(0, 0, 0, 0.6);
+  margin: 0;
+  max-width: 60ch;
+}
+
+.altas-error {
+  color: var(--mat-sys-error, #b3261e);
+  margin-bottom: 16px;
+}
+
+.altas-form {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.altas-input {
+  width: 220px;
+}
+
+.altas-form button[mat-flat-button],
+.altas-form button[mat-stroked-button] {
+  height: 56px;
+}
+
+.altas-preview-error {
+  color: var(--mat-sys-error, #b3261e);
+  margin: -8px 0 16px;
+}
+
+.altas-preview-vacio {
+  color: rgba(0, 0, 0, 0.6);
+  margin: -8px 0 16px;
+}
+
+.altas-preview {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: -8px 0 16px;
+}
+
+.altas-preview-nombre {
+  font-weight: 500;
+  margin: 0 0 2px;
+}
+
+.altas-preview-detalle {
+  color: rgba(0, 0, 0, 0.6);
+  margin: 0;
+  font-size: 13px;
+}
+
+.altas-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.altas-vacio {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.altas-tabla {
+  width: 100%;
+}
+
+// Sin mat-form-field a proposito: se ve como texto plano de la tabla
+// (sin borde/outline) y solo se nota que es editable por la flechita y
+// el hover - mas homogeneo que una caja con borde metida en una celda.
+.oficina-select {
+  width: 160px;
+  padding: 4px 8px;
+  border-radius: 6px;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  &.mat-mdc-select-disabled {
+    opacity: 0.6;
+  }
+}
+
+.estado-chip {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.estado-pendiente {
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.estado-activo {
+  background: #e6f4ea;
+  color: #1e7e34;
+}

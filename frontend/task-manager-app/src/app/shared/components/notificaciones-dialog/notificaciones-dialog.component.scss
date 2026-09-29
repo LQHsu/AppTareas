@@ -1,0 +1,36 @@
+.notificaciones__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 320px;
+  max-width: 420px;
+  padding-top: 4px;
+}
+
+.notificaciones__lede {
+  margin: 0;
+  font-size: 13px;
+  color: var(--app-text-muted);
+}
+
+.notificaciones__opcion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.notificaciones__opcion-texto {
+  display: flex;
+  flex-direction: column;
+}
+
+.notificaciones__opcion-titulo {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.notificaciones__opcion-ayuda {
+  font-size: 12px;
+  color: var(--app-text-muted);
+}

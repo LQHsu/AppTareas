@@ -4,6 +4,10 @@ public record UpdateSuperAdminDto(bool IsSuperAdmin);
 
 public record UpdateBannedDto(bool IsBanned);
 
+public record TestEmailDto(string To);
+
+public record TestChatMessageDto(string To, Guid TaskId);
+
 // Vista global de un proyecto para el panel de super admin. Se
 // diferencia de ProjectDto en que agrega MemberCount y no filtra por
 // membresia del solicitante (aqui se listan TODOS los proyectos).

@@ -18,6 +18,8 @@ export interface FolderDto {
   taskCount: number;
   // false cuando la carpeta me la compartieron: la veo pero no la administro.
   isOwner: boolean;
+  // Color elegido por el dueno (hex), null si no eligio.
+  color: string | null;
 }
 
 export interface ShareFolderResultDto {
@@ -35,12 +37,12 @@ export class FolderService {
     return this.http.get<FolderDto[]>(this.baseUrl);
   }
 
-  create(name: string): Observable<FolderDto> {
-    return this.http.post<FolderDto>(this.baseUrl, { name });
+  create(name: string, color: string | null = null): Observable<FolderDto> {
+    return this.http.post<FolderDto>(this.baseUrl, { name, color });
   }
 
-  rename(id: string, name: string): Observable<FolderDto> {
-    return this.http.patch<FolderDto>(`${this.baseUrl}/${id}`, { name });
+  rename(id: string, name: string, color: string | null = null): Observable<FolderDto> {
+    return this.http.patch<FolderDto>(`${this.baseUrl}/${id}`, { name, color });
   }
 
   delete(id: string): Observable<void> {

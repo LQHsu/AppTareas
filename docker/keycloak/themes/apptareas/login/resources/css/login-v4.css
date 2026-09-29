@@ -1,0 +1,116 @@
+/* AppTareas: recolorea el acento del login de Keycloak con la misma
+ * paleta de la app (--app-blue en frontend/task-manager-app/src/
+ * styles.scss: #2E5966 / #274c57 / #F2F6FF).
+ *
+ * Se sobreescriben los TOKENS GLOBALES de PatternFly v5, no selectores
+ * de componente - confirmado inspeccionando el CSS real de este
+ * Keycloak (org.keycloak.keycloak-themes-26.0.8.jar) que el boton
+ * primario y el borde de foco de los inputs YA leen de estos mismos
+ * tokens (--pf-v5-c-button--m-primary--BackgroundColor:
+ * var(--pf-v5-global--primary-color--100), etc.) - es el metodo de
+ * personalizacion que PatternFly espera, evita pelear con la
+ * especificidad del CSS minificado (ya nos paso una vez en este mismo
+ * proyecto con el theme de Tabulator - no vale la pena repetirlo).
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+:root {
+  --pf-v5-global--primary-color--100: #2E5966;
+  --pf-v5-global--primary-color--200: #1B3941;
+  --pf-v5-global--link--Color--dark: #2E5966;
+  --pf-v5-global--link--Color--dark--hover: #1B3941;
+}
+
+body,
+.pf-v5-c-login,
+.pf-v5-c-form-control,
+.pf-v5-c-button {
+  font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+}
+
+/* #keycloak-bg es el id real del <body> (confirmado en template.ftl).
+ *
+ * Cuadricula sutil tipo cuaderno: dos gradientes lineales (uno
+ * horizontal, uno vertical) del mismo azul de marca (--app-blue,
+ * #2E5966) a muy baja opacidad, repetidos cada 24px sobre fondo
+ * blanco. Mismo patron que login.component.scss del frontend (deben
+ * verse identicos, son dos apps distintas -Angular y Keycloak- que no
+ * comparten hoja de estilos). */
+#keycloak-bg {
+  background-color: #FFFFFF;
+  background-image:
+    linear-gradient(rgba(46, 89, 102, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46, 89, 102, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* #kc-header-wrapper (el nombre del realm, "apptareas") vive en
+ * .pf-v5-c-login__header, que NO tiene fondo propio - flota directo
+ * sobre #keycloak-bg, fuera de la caja blanca del formulario
+ * (.pf-v5-c-login__main es la unica con --pf-v5-c-login__main--
+ * BackgroundColor + sombra, confirmado en patternfly.min.css). Ahi el
+ * logo se veia "fuera de la caja", y el texto del realm es blanco fijo
+ * con !important (pensado para un fondo oscuro que este Keycloak no
+ * usa) asi que era ademas invisible sobre blanco. Se oculta: el nombre
+ * "AppTareas" ya se ve en el titulo real dentro de la caja
+ * (loginAccountTitle, mas abajo).
+ */
+#kc-header-wrapper {
+  display: none;
+}
+
+/* Logo UAM AHORA SI dentro de la caja blanca real (.pf-v5-c-login__main
+ * tiene el fondo opaco + la sombra, esta es "la box"), como fondo
+ * arriba-centro. padding-block-start en .pf-v5-c-login__main-header
+ * (el bloque que envuelve el titulo "Inicia sesion en AppTareas") le
+ * hace espacio para que no se encimen. */
+.pf-v5-c-login__main {
+  background-image: url(../img/LogoUAMEncabezado.png);
+  background-repeat: no-repeat;
+  background-position: top 24px center;
+  /* 20% mas grande que el tamaño original (180px). */
+  background-size: 216px auto;
+}
+
+.pf-v5-c-login__main-header {
+  /* +10px respecto a 90px: el logo crecio ~9px de alto al pasar de
+     180px a 216px de ancho (misma proporcion), se ajusta el espacio
+     para mantener el mismo margen debajo del logo. */
+  padding-block-start: 100px !important;
+}
+
+/* Texto de ayuda que agrega login.js arriba del formulario. */
+.apptareas-login-hint {
+  color: #5B6472; /* --app-text-muted */
+  font-size: 0.875rem;
+  margin: 0 0 1rem;
+}
+
+/* Icono en cada label (login.js los inserta como <i>) - solo separa
+ * un poco del texto, el color/tamano ya los trae Font Awesome. */
+label .fas {
+  margin-right: 0.35rem;
+  color: #2E5966;
+}
+
+/* Spinner del boton "Acceder" mientras verifica - respeta
+ * prefers-reduced-motion, no gira si el usuario lo desactivo en su SO. */
+.apptareas-spinner {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: #fff;
+  border-radius: 50%;
+  vertical-align: -0.15em;
+  animation: apptareas-spin 0.7s linear infinite;
+}
+
+@keyframes apptareas-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .apptareas-spinner { animation: none; }
+}

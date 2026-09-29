@@ -22,6 +22,55 @@ namespace TaskManager.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("TaskManager.Domain.Entities.AltaCoordinador", b =>
+                {
+                    b.Property<string>("NumeroEconomico")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("AreaId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AreaInstitucional")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CorreoInstitucional")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedById")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("NombreCompleto")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("OficinaId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("NumeroEconomico");
+
+                    b.HasIndex("AreaId");
+
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("OficinaId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AltasCoordinador");
+                });
+
             modelBuilder.Entity("TaskManager.Domain.Entities.Area", b =>
                 {
                     b.Property<int>("Id")
@@ -50,6 +99,10 @@ namespace TaskManager.Infrastructure.Migrations
 
                     b.Property<int>("AreaId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -88,6 +141,10 @@ namespace TaskManager.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -237,6 +294,9 @@ namespace TaskManager.Infrastructure.Migrations
                     b.Property<DateTime?>("FechaAtencion")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("FechaLimite")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime?>("FechaTerminacion")
                         .HasColumnType("datetime2");
 
@@ -325,10 +385,22 @@ namespace TaskManager.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("GoogleChatUserId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsBanned")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsCoordinador")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsSuperAdmin")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotifyByChat")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotifyByEmail")
                         .HasColumnType("bit");
 
                     b.Property<string>("Username")
@@ -340,6 +412,39 @@ namespace TaskManager.Infrastructure.Migrations
                     b.HasIndex("AreaId");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("TaskManager.Domain.Entities.AltaCoordinador", b =>
+                {
+                    b.HasOne("TaskManager.Domain.Entities.Area", "Area")
+                        .WithMany()
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TaskManager.Domain.Entities.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TaskManager.Domain.Entities.ProjectFolder", "Oficina")
+                        .WithMany()
+                        .HasForeignKey("OficinaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TaskManager.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Area");
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("Oficina");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("TaskManager.Domain.Entities.Project", b =>

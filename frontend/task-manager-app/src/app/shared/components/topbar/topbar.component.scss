@@ -1,0 +1,87 @@
+// Misma paleta que el resto de la app (--app-*, ver styles.scss), no la
+// del navbar.css original (--accent-*): asi la topbar no introduce un
+// segundo sistema de color.
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 64px;
+  padding: 0 20px;
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  flex: none;
+}
+
+.topbar__logo {
+  // 10% mas grande que el tamaño original (40px).
+  height: 49px;
+  width: auto;
+  display: block;
+}
+
+.topbar__usuario {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-text);
+  font-weight: 500;
+  // El boton de mat-button centra su contenido por default - se
+  // necesita que nombre/rol se apilen a la izquierda, no al centro.
+  text-align: left;
+}
+
+// Nombre y rol apilados (en vez de lado a lado como antes): asi el rol
+// se lee como subtitulo del nombre, no como una etiqueta pegada a el.
+.topbar__datos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+.topbar__rol {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+  white-space: nowrap;
+}
+
+.topbar__nombre {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__chevron {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--app-text-subtle);
+}
+
+.topbar__menu-header {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--app-text-subtle);
+  border-bottom: 1px solid var(--app-border);
+  margin-bottom: 4px;
+}
+
+@media (max-width: 600px) {
+  .topbar {
+    padding: 0 12px;
+    // Solo el logo: el nombre+rol+chevron se amontonaban en pantallas
+    // angostas. Cerrar sesion sigue disponible desde el sidenav
+    // (shell-link--logout), no se pierde la funcionalidad.
+    justify-content: center;
+  }
+
+  .topbar__usuario {
+    display: none;
+  }
+}

@@ -45,11 +45,16 @@ export class TareaDetalleDialogComponent {
   }>();
   @Output() subtaskStatusChange = new EventEmitter<{ subtask: TaskItemDto; status: TaskItemStatus }>();
   @Output() subtaskCreate = new EventEmitter<{ title: string; assignedToId: string | null }>();
-  @Output() detailsChange = new EventEmitter<{ title: string; description: string | null }>();
+  @Output() detailsChange = new EventEmitter<{
+    title: string;
+    description: string | null;
+    fechaLimite: string | null;
+  }>();
   @Output() subtaskDetailsChange = new EventEmitter<{
     subtask: TaskItemDto;
     title: string;
     description: string | null;
+    fechaLimite: string | null;
   }>();
 
   constructor(@Inject(MAT_DIALOG_DATA) public data: TareaDetalleDialogData) {

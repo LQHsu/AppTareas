@@ -12,6 +12,13 @@ export interface TaskCommentDto {
   createdAt: string;
 }
 
+// Payload del evento SignalR "CommentDeleted" (ver RealtimeService) -
+// a diferencia de "CommentAdded", que manda el TaskCommentDto completo.
+export interface CommentDeletedDto {
+  taskId: string;
+  commentId: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TaskCommentService {
   private baseUrl(taskId: string): string {

@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { MatCardModule } from '@angular/material/card';
@@ -10,11 +11,19 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { TaskService, TaskItemDto, TaskItemStatus } from '../../core/services/task.service';
+import {
+  TaskService,
+  TaskItemDto,
+  TaskItemStatus,
+  fechaLimiteToString,
+} from '../../core/services/task.service';
 import { UserService, UserDto } from '../../core/services/user.service';
+import { TaskCommentService } from '../../core/services/task-comment.service';
 import { TareasTablaComponent } from '../../shared/components/tareas-tabla/tareas-tabla.component';
 import { TareaDetalleDialogComponent } from '../../shared/components/tarea-detalle-dialog/tarea-detalle-dialog.component';
+import { MarcarAtendidaDialogComponent } from '../../shared/components/marcar-atendida-dialog/marcar-atendida-dialog.component';
 import { EditorTextoComponent } from '../../shared/components/editor-texto/editor-texto.component';
 import { RealtimeService } from '../../core/services/realtime.service';
 
@@ -39,6 +48,7 @@ import { RealtimeService } from '../../core/services/realtime.service';
     MatInputModule,
     MatSelectModule,
     MatProgressSpinnerModule,
+    MatDatepickerModule,
     MatDialogModule,
     TareasTablaComponent,
     EditorTextoComponent,
@@ -60,14 +70,20 @@ export class MisTareasComponent implements OnInit, OnDestroy {
   constructor(
     private fb: FormBuilder,
     private taskService: TaskService,
+    private commentService: TaskCommentService,
     private userService: UserService,
     private dialog: MatDialog,
-    private realtime: RealtimeService
+    private realtime: RealtimeService,
+    private route: ActivatedRoute,
+    private router: Router
   ) {
     this.taskForm = this.fb.group({
       title: ['', Validators.required],
       description: [''],
       assignedToIds: [[] as string[]],
+      // Puramente informativa (ver comentario en TaskItem.cs) - Date de
+      // mat-datepicker, o null si no se elige (ver fechaLimiteToString).
+      fechaLimite: [null as Date | null],
     });
   }
 
@@ -113,12 +129,28 @@ export class MisTareasComponent implements OnInit, OnDestroy {
       next: (tasks) => {
         this.tasks.set(tasks);
         this.loading.set(false);
+        this.abrirTareaDelLink();
       },
       error: () => {
         this.errorMessage.set('No se pudieron cargar tus tareas.');
         this.loading.set(false);
       },
     });
+  }
+
+  // Deep link desde las notificaciones (correo/Chat, ver
+  // TaskNotificationService): "?tarea={id}" abre de una vez el modal de
+  // detalle de esa tarea, en vez de dejar a la persona buscarla a mano
+  // en la lista. Se limpia el query param despues de abrir para que un
+  // refresh de la pagina no lo vuelva a abrir solo.
+  private abrirTareaDelLink(): void {
+    const tareaId = this.route.snapshot.queryParamMap.get('tarea');
+    if (!tareaId) return;
+
+    this.router.navigate([], { queryParams: {}, replaceUrl: true });
+
+    const task = this.tasks().find((t) => t.id === tareaId);
+    if (task) this.openTaskDetail(task);
   }
 
   private loadCurrentUserArea(): void {
@@ -148,6 +180,7 @@ export class MisTareasComponent implements OnInit, OnDestroy {
     const title = this.taskForm.value.title!;
     const description = this.taskForm.value.description || null;
     const assignedToIds: string[] = this.taskForm.value.assignedToIds || [];
+    const fechaLimite = fechaLimiteToString(this.taskForm.value.fechaLimite ?? null);
 
     // Igual que en proyecto-detalle: sin nadie seleccionado se crea una
     // sola tarea suelta sin asignar; con varias personas, una tarea
@@ -162,6 +195,7 @@ export class MisTareasComponent implements OnInit, OnDestroy {
           projectId: null,
           assignedToId,
           parentTaskId: null,
+          fechaLimite,
         })
         .pipe(catchError(() => of(null)))
     );
@@ -171,7 +205,17 @@ export class MisTareasComponent implements OnInit, OnDestroy {
       // Se agregan a la vista aunque no esten asignadas a mi: es util
       // ver de inmediato lo que se acaba de crear. Un refresh (GetMine)
       // las quitaria si no me las asigne a mi mismo.
-      this.tasks.update((list) => [...newTasks, ...list]);
+      //
+      // El filtro evita duplicados: TaskHub tambien me notifica a mi
+      // mismo (soy el creador, ver TasksController) via "TaskChanged" -
+      // si ese evento llega antes que esta respuesta HTTP,
+      // applyRealtimeUpdate ya la agrego. Mismo fix que en
+      // proyecto-detalle.component.ts.
+      this.tasks.update((list) => {
+        const yaAgregadasPorSocket = new Set(list.map((t) => t.id));
+        const faltantes = newTasks.filter((t) => !yaAgregadasPorSocket.has(t.id));
+        return [...faltantes, ...list];
+      });
       this.creatingTask.set(false);
 
       if (newTasks.length < results.length) {
@@ -187,12 +231,51 @@ export class MisTareasComponent implements OnInit, OnDestroy {
 
   // onDone: se usa desde el modal de detalle para refrescar la tarea que
   // esta mostrando una vez que el cambio ya se guardo (ver openTaskDetail).
+  //
+  // Atendida es el unico estado con una parada extra: antes de mandarlo,
+  // se abre un dialogo invitando a dejar un comentario de que se hizo
+  // para resolverla (ver MarcarAtendidaDialogComponent). Es opcional -
+  // si se deja vacio o se cierra con la X, sigue contando como
+  // "continuar sin comentario", solo cancelar de verdad (boton
+  // Cancelar) aborta el cambio de estado completo.
   onStatusChange(task: TaskItemDto, newStatus: TaskItemStatus, onDone?: () => void): void {
+    if (newStatus !== TaskItemStatus.Atendida) {
+      this.aplicarCambioEstado(task, newStatus, null, onDone);
+      return;
+    }
+
+    this.dialog
+      .open(MarcarAtendidaDialogComponent, {
+        data: { taskTitle: task.title },
+        width: '480px',
+        maxWidth: '95vw',
+        autoFocus: false,
+      })
+      .afterClosed()
+      .subscribe((comentario?: string) => {
+        if (comentario === undefined) return; // Cancelar: no se toca el estado
+        this.aplicarCambioEstado(task, newStatus, comentario || null, onDone);
+      });
+  }
+
+  private aplicarCambioEstado(
+    task: TaskItemDto,
+    newStatus: TaskItemStatus,
+    comentario: string | null,
+    onDone?: () => void
+  ): void {
     this.taskService.updateStatus(task.id, newStatus).subscribe({
       next: (updated) => {
         this.tasks.update((list) =>
           list.map((t) => (t.id === updated.id ? updated : t))
         );
+        // Mismo servicio/endpoint que el resto de comentarios (ver
+        // TareaCardComponent) - queda como cualquier otro, con su mismo
+        // broadcast en vivo. Sin bloquear el cambio de estado si falla:
+        // ya se marco como atendida, lo unico que se pierde es la nota.
+        if (comentario) {
+          this.commentService.create(task.id, comentario).subscribe();
+        }
         onDone?.();
       },
       error: () => {
@@ -203,10 +286,10 @@ export class MisTareasComponent implements OnInit, OnDestroy {
 
   onTaskDetailsChange(
     task: TaskItemDto,
-    data: { title: string; description: string | null },
+    data: { title: string; description: string | null; fechaLimite: string | null },
     onDone?: () => void
   ): void {
-    this.taskService.updateDetails(task.id, data.title, data.description).subscribe({
+    this.taskService.updateDetails(task.id, data.title, data.description, data.fechaLimite).subscribe({
       next: (updated) => {
         this.tasks.update((list) => list.map((t) => (t.id === updated.id ? updated : t)));
         onDone?.();

@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 // FormsModule (ngModel) convive con ReactiveFormsModule: el form de
 // crear tarea usa reactive, y la edicion del proyecto usa ngModel sobre
 // campos sueltos fuera de cualquier formGroup. No se mezclan en el
@@ -17,8 +17,14 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { TaskService, TaskItemDto, TaskItemStatus } from '../../../core/services/task.service';
+import {
+  TaskService,
+  TaskItemDto,
+  TaskItemStatus,
+  fechaLimiteToString,
+} from '../../../core/services/task.service';
 import { ProjectService, ProjectDto } from '../../../core/services/project.service';
 import {
   ProjectMemberService,
@@ -26,10 +32,13 @@ import {
 } from '../../../core/services/project-member.service';
 import { UserService, UserDto } from '../../../core/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { TaskCommentService } from '../../../core/services/task-comment.service';
 import { TareasTablaComponent } from '../../../shared/components/tareas-tabla/tareas-tabla.component';
+import { MarcarAtendidaDialogComponent } from '../../../shared/components/marcar-atendida-dialog/marcar-atendida-dialog.component';
 import { ProyectoEstadisticasComponent } from '../proyecto-estadisticas/proyecto-estadisticas.component';
 import { ProyectoArchivosComponent } from '../proyecto-archivos/proyecto-archivos.component';
 import { EditorTextoComponent } from '../../../shared/components/editor-texto/editor-texto.component';
+import { ColorPickerComponent } from '../../../shared/components/color-picker/color-picker.component';
 import { TareaDetalleDialogComponent } from '../../../shared/components/tarea-detalle-dialog/tarea-detalle-dialog.component';
 import { RealtimeService } from '../../../core/services/realtime.service';
 
@@ -50,11 +59,13 @@ import { RealtimeService } from '../../../core/services/realtime.service';
     MatProgressSpinnerModule,
     MatChipsModule,
     MatTabsModule,
+    MatDatepickerModule,
     MatDialogModule,
     TareasTablaComponent,
     ProyectoEstadisticasComponent,
     ProyectoArchivosComponent,
     EditorTextoComponent,
+    ColorPickerComponent,
   ],
   templateUrl: './proyecto-detalle.component.html',
   styleUrl: './proyecto-detalle.component.scss',
@@ -79,6 +90,12 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
 
   errorMessage = signal<string | null>(null);
 
+  // Para el selector de "cambiar de proyecto" en el header: los mismos
+  // que listaria /proyectos (dueno o miembro), cargados una sola vez -
+  // a diferencia de project/tasks/members, esta lista no cambia al
+  // cambiar de proyecto dentro de esta misma pantalla.
+  otrosProyectos = signal<ProjectDto[]>([]);
+
   // Solo el dueno del proyecto puede invitar/quitar miembros.
   // Esto es solo UX: la validacion real vuelve a ocurrir en el backend.
   isOwner = computed(() => {
@@ -90,8 +107,10 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private fb: FormBuilder,
     private taskService: TaskService,
+    private commentService: TaskCommentService,
     private projectService: ProjectService,
     private memberService: ProjectMemberService,
     private userService: UserService,
@@ -104,26 +123,76 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     // Puede quedar vacio (tarea sin asignar) o traer varias personas:
     // en ese caso se crea una tarea independiente por cada una.
     assignedToIds: [[] as string[]],
+    // Puramente informativa (ver comentario en TaskItem.cs) - Date de
+    // mat-datepicker, o null si no se elige (ver fechaLimiteToString).
+    fechaLimite: [null as Date | null],
   });}
 
   private realtimeSub?: Subscription;
+  private paramMapSub?: Subscription;
 
   ngOnInit(): void {
-    this.projectId = this.route.snapshot.paramMap.get('id') ?? '';
-    this.loadProject();
-    this.loadTasks();
-    this.loadMembers();
+    this.loadOtrosProyectos();
 
     // Cualquiera con este proyecto abierto ve en vivo los cambios que
     // haga otra persona (crear tarea, cambiar estado, reasignar) sin
     // tener que refrescar. Ver RealtimeService y TaskHub en el backend.
-    this.realtime.joinProject(this.projectId);
     this.realtimeSub = this.realtime.taskChanged$.subscribe((t) => this.applyRealtimeUpdate(t));
+
+    // Suscripcion (no snapshot): el selector "Cambiar de proyecto" del
+    // header navega a /proyectos/:id con un id distinto, pero sigue
+    // siendo la MISMA ruta (mismo componente) - Angular no vuelve a
+    // llamar ngOnInit en ese caso, solo cambia el paramMap. Sin esto la
+    // pantalla se quedaria mostrando el proyecto viejo hasta un F5.
+    this.paramMapSub = this.route.paramMap.subscribe((params) => {
+      const nuevoId = params.get('id') ?? '';
+      // Cubre tanto la primera carga (projectId todavia vacio, nunca
+      // coincide) como una re-emision con el mismo id (evita recargar
+      // todo de mas si eso llega a pasar).
+      if (nuevoId === this.projectId) return;
+
+      if (this.projectId) {
+        this.realtime.leaveProject(this.projectId);
+      }
+
+      this.projectId = nuevoId;
+      this.resetEstadoUI();
+      this.loadProject();
+      this.loadTasks();
+      this.loadMembers();
+      this.realtime.joinProject(this.projectId);
+    });
   }
 
   ngOnDestroy(): void {
     this.realtime.leaveProject(this.projectId);
     this.realtimeSub?.unsubscribe();
+    this.paramMapSub?.unsubscribe();
+  }
+
+  // Limpia formularios/paneles abiertos al cambiar de proyecto - siguen
+  // referenciando al proyecto anterior (miembros, asignados, etc.) y no
+  // tiene sentido dejarlos abiertos con datos que ya no aplican.
+  private resetEstadoUI(): void {
+    this.editandoProyecto.set(false);
+    this.showCreateTaskForm.set(false);
+    this.showInviteForm.set(false);
+    this.selectedInviteeId.set(null);
+    this.taskForm.reset({ title: '', description: '', assignedToIds: [], fechaLimite: null });
+  }
+
+  loadOtrosProyectos(): void {
+    this.projectService.getMine().subscribe({
+      next: (proyectos) => this.otrosProyectos.set(proyectos),
+      // Silencioso a proposito: es solo el selector del header, no
+      // bloquea nada de la pantalla si falla.
+      error: () => {},
+    });
+  }
+
+  cambiarDeProyecto(id: string): void {
+    if (id === this.projectId) return;
+    this.router.navigate(['/proyectos', id]);
   }
 
   // --- Edicion del proyecto (nombre + descripcion) ---
@@ -133,6 +202,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
   guardandoProyecto = signal(false);
   edicionNombre = '';
   edicionDescripcion: string | null = null;
+  edicionColor: string | null = null;
 
   entrarEdicionProyecto(): void {
     const p = this.project();
@@ -140,6 +210,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
 
     this.edicionNombre = p.name;
     this.edicionDescripcion = p.description;
+    this.edicionColor = p.color;
     this.editandoProyecto.set(true);
   }
 
@@ -153,7 +224,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
 
     this.guardandoProyecto.set(true);
 
-    this.projectService.update(this.projectId, nombre, this.edicionDescripcion).subscribe({
+    this.projectService.update(this.projectId, nombre, this.edicionDescripcion, this.edicionColor).subscribe({
       next: (actualizado) => {
         this.project.set(actualizado);
         this.guardandoProyecto.set(false);
@@ -172,12 +243,21 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
       next: (project) => {
         this.project.set(project);
         this.loadingProject.set(false);
+        // Si el proyecto vive en una carpeta compartida, se asume que
+        // las tareas nuevas son para esa persona por defecto (se puede
+        // cambiar a mano antes de crear).
+        this.taskForm.patchValue({ assignedToIds: this.defaultAssignedToIds() });
       },
       error: () => {
         this.errorMessage.set('No se pudo cargar el proyecto.');
         this.loadingProject.set(false);
       },
     });
+  }
+
+  private defaultAssignedToIds(): string[] {
+    const sharedWithId = this.project()?.folderSharedWithId;
+    return sharedWithId ? [sharedWithId] : [];
   }
 
   loadTasks(): void {
@@ -223,6 +303,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     const title = this.taskForm.value.title!;
     const description = this.taskForm.value.description || null;
     const assignedToIds: string[] = this.taskForm.value.assignedToIds || [];
+    const fechaLimite = fechaLimiteToString(this.taskForm.value.fechaLimite ?? null);
 
     // Si no se elige a nadie, se crea una sola tarea sin asignar. Si se
     // eligen varias personas, no es una tarea compartida: se crea una
@@ -237,13 +318,26 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
           projectId: this.projectId,
           assignedToId,
           parentTaskId: null,
+          fechaLimite,
         })
         .pipe(catchError(() => of(null)))
     );
 
     forkJoin(creations).subscribe((results) => {
       const newTasks = results.filter((t): t is TaskItemDto => t !== null);
-      this.tasks.update((list) => [...newTasks, ...list]);
+
+      // El TaskHub (SignalR) le manda "TaskChanged" a todos los
+      // miembros del proyecto en cuanto se crea la tarea, incluido quien
+      // la creo - si ese evento llega antes que esta respuesta HTTP,
+      // applyRealtimeUpdate ya la agrego a `tasks`. Sin este filtro se
+      // duplicaba visualmente (desaparecia al refrescar con F5 porque
+      // loadTasks() vuelve a traer la lista real de la BD, sin
+      // duplicados).
+      this.tasks.update((list) => {
+        const yaAgregadasPorSocket = new Set(list.map((t) => t.id));
+        const faltantes = newTasks.filter((t) => !yaAgregadasPorSocket.has(t.id));
+        return [...faltantes, ...list];
+      });
       this.creatingTask.set(false);
 
       if (newTasks.length < results.length) {
@@ -252,17 +346,61 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
         );
       } else {
         this.showCreateTaskForm.set(false);
-        this.taskForm.reset();
+        this.taskForm.reset({
+          title: '',
+          description: '',
+          assignedToIds: this.defaultAssignedToIds(),
+          fechaLimite: null,
+        });
       }
     });
   }
 
   // onDone: se usa desde el modal de detalle para refrescar la tarea que
   // esta mostrando una vez que el cambio ya se guardo (ver openTaskDetail).
+  //
+  // Atendida es el unico estado con una parada extra: antes de mandarlo,
+  // se abre un dialogo invitando a dejar un comentario de que se hizo
+  // para resolverla (ver MarcarAtendidaDialogComponent). Es opcional -
+  // si se deja vacio o se cierra con la X, sigue contando como
+  // "continuar sin comentario", solo cancelar de verdad (boton
+  // Cancelar) aborta el cambio de estado completo.
   onStatusChange(task: TaskItemDto, newStatus: TaskItemStatus, onDone?: () => void): void {
+    if (newStatus !== TaskItemStatus.Atendida) {
+      this.aplicarCambioEstado(task, newStatus, null, onDone);
+      return;
+    }
+
+    this.dialog
+      .open(MarcarAtendidaDialogComponent, {
+        data: { taskTitle: task.title },
+        width: '480px',
+        maxWidth: '95vw',
+        autoFocus: false,
+      })
+      .afterClosed()
+      .subscribe((comentario?: string) => {
+        if (comentario === undefined) return; // Cancelar: no se toca el estado
+        this.aplicarCambioEstado(task, newStatus, comentario || null, onDone);
+      });
+  }
+
+  private aplicarCambioEstado(
+    task: TaskItemDto,
+    newStatus: TaskItemStatus,
+    comentario: string | null,
+    onDone?: () => void
+  ): void {
     this.taskService.updateStatus(task.id, newStatus).subscribe({
       next: (updated) => {
         this.replaceTask(updated);
+        // Mismo servicio/endpoint que el resto de comentarios (ver
+        // TareaCardComponent) - queda como cualquier otro, con su mismo
+        // broadcast en vivo. Sin bloquear el cambio de estado si falla:
+        // ya se marco como atendida, lo unico que se pierde es la nota.
+        if (comentario) {
+          this.commentService.create(task.id, comentario).subscribe();
+        }
         onDone?.();
       },
       error: () => {
@@ -285,10 +423,10 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
 
   onTaskDetailsChange(
     task: TaskItemDto,
-    data: { title: string; description: string | null },
+    data: { title: string; description: string | null; fechaLimite: string | null },
     onDone?: () => void
   ): void {
-    this.taskService.updateDetails(task.id, data.title, data.description).subscribe({
+    this.taskService.updateDetails(task.id, data.title, data.description, data.fechaLimite).subscribe({
       next: (updated) => {
         this.replaceTask(updated);
         onDone?.();
@@ -390,10 +528,15 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
       })
       .subscribe({
         next: (newSubtask) => {
+          // Mismo fix que onCreateTask: si TaskChanged (SignalR) llego
+          // antes que esta respuesta HTTP, applyRealtimeUpdate ya colgo
+          // la subtarea del padre.
           this.tasks.update((list) =>
-            list.map((t) =>
-              t.id === parent.id ? { ...t, subtasks: [...t.subtasks, newSubtask] } : t
-            )
+            list.map((t) => {
+              if (t.id !== parent.id) return t;
+              if (t.subtasks.some((s) => s.id === newSubtask.id)) return t;
+              return { ...t, subtasks: [...t.subtasks, newSubtask] };
+            })
           );
           onDone?.();
         },
@@ -434,7 +577,11 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     instance.subtaskCreate.subscribe((v) => this.onSubtaskCreate(task, v, refresh));
     instance.detailsChange.subscribe((v) => this.onTaskDetailsChange(task, v, refresh));
     instance.subtaskDetailsChange.subscribe((v) =>
-      this.onTaskDetailsChange(v.subtask, { title: v.title, description: v.description }, refresh)
+      this.onTaskDetailsChange(
+        v.subtask,
+        { title: v.title, description: v.description, fechaLimite: v.fechaLimite },
+        refresh
+      )
     );
   }
 

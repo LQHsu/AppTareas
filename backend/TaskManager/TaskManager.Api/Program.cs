@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.Auth;
 using TaskManager.Api.Hubs;
+using TaskManager.Api.Institucional;
 using TaskManager.Api.Middleware;
+using TaskManager.Api.Notificaciones;
 using TaskManager.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -132,6 +134,31 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+
+// --- Datos institucionales (preview en la vista de "Dar de alta") ---
+// Mismas fuentes que ya usa el SPI custom de Keycloak (CUSXACDI SOAP +
+// info_usuarios_unidad MySQL), consultadas aparte desde el backend .NET
+// solo para mostrarle al coordinador nombre/correo/area antes de
+// confirmar el alta - ver CoordinadorController.PreviewAlta.
+builder.Services.AddHttpClient<CusxacdiInfoClient>();
+builder.Services.AddSingleton<InfoUsuariosUnidadClient>();
+
+// --- Correo institucional (relay SMTP interno de la UAM) ---
+// Mismo relay que ya usa appcafeteria en produccion (xsmtp.xoc.uam.mx),
+// ver EmailService. Host vacio en la config = correo deshabilitado.
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
+builder.Services.AddSingleton<EmailService>();
+
+// --- Notificaciones por Google Chat (DM interactivo) ---
+// Ver GoogleChatClient/ChatInteractionsController - resuelve su propia
+// config directo de IConfiguration (acepta Base64 o el JSON pegado tal
+// cual, ver comentario ahi). Seccion vacia/incompleta = Chat deshabilitado.
+builder.Services.AddSingleton<GoogleChatClient>();
+
+// Punto unico que combina correo + Chat para avisar de un evento de
+// tarea (ver TaskNotificationService) - lo usan TasksController/
+// TaskCommentsController.
+builder.Services.AddSingleton<TaskNotificationService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

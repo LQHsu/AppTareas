@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (formWrapper) {
     formWrapper.insertAdjacentHTML(
       'afterbegin',
-      '<p class="apptareas-login-hint">Ingresa tu número económico y tu NIP para continuar.</p>'
+      '<p class="apptareas-login-hint">Ingresa los datos de tu Cuenta Única de Servicios (CUS).</p>'
     );
   }
 

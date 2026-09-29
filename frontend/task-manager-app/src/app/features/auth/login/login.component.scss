@@ -3,8 +3,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0b2545 0%, #13315c 100%);
   padding: 16px;
+  // Cuadricula sutil tipo cuaderno: dos gradientes lineales (uno
+  // horizontal, uno vertical) del azul de marca (--app-blue) a muy baja
+  // opacidad, repetidos cada 24px sobre blanco. Mismo patron que
+  // login.css del theme de Keycloak (deben verse identicos aunque son
+  // dos apps distintas que no comparten hoja de estilos).
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(rgba(46, 89, 102, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46, 89, 102, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 .login-card {
@@ -27,8 +36,10 @@
 }
 
 .login-logo {
-  width: 72px;
-  height: 72px;
+  // Es un logo horizontal (wordmark), no un icono cuadrado: se fija el
+  // ancho y se deja la altura automatica para no deformarlo.
+  width: 220px;
+  height: auto;
   margin-bottom: 8px;
 }
 

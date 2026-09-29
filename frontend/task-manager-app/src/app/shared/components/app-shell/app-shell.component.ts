@@ -11,6 +11,7 @@ import { TaskService, TaskItemDto } from '../../../core/services/task.service';
 import { UserService } from '../../../core/services/user.service';
 import { RealtimeService } from '../../../core/services/realtime.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { TopbarComponent } from '../topbar/topbar.component';
 
 // Layout persistente para toda la app autenticada (ver app.routes.ts:
 // envuelve proyectos/proyectos:id/mis-tareas/admin como hijos). Colapsado
@@ -33,6 +34,7 @@ import { AuthService } from '../../../core/services/auth.service';
     MatIconModule,
     MatButtonModule,
     MatTooltipModule,
+    TopbarComponent,
   ],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss',

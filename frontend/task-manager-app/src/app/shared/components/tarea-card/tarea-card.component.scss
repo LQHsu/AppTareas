@@ -89,6 +89,12 @@
   margin-top: 10px;
 }
 
+.campo-fecha-limite {
+  display: block;
+  margin-top: 12px;
+  max-width: 220px;
+}
+
 .meta-item {
   display: inline-flex;
   align-items: center;
@@ -102,6 +108,14 @@
     height: 16px;
     color: var(--app-text-subtle);
   }
+}
+
+.meta-item__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
 }
 
 /* ---------- Badge de estado ---------- */
@@ -508,6 +522,45 @@
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ---------- Historial de estados ---------- */
+
+.lista-historial {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.historial-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface);
+}
+
+.historial-item__icono {
+  flex: none;
+  margin-top: 1px;
+  color: var(--app-text-subtle);
+}
+
+.historial-item__texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.historial-item__fecha {
+  font-size: 11.5px;
+  color: var(--app-text-subtle);
 }
 
 /* ---------- Botones de eliminar (adjunto / comentario) ---------- */

@@ -12,6 +12,8 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { FolderService, FolderDto } from '../../core/services/folder.service';
 import { UserService, UserDto } from '../../core/services/user.service';
 import { CompartirCarpetaDialogComponent } from '../../shared/components/compartir-carpeta-dialog/compartir-carpeta-dialog.component';
+import { ColorPickerComponent } from '../../shared/components/color-picker/color-picker.component';
+import { bannerColor, contrastTextColor } from '../../shared/color-palette';
 
 // Vista dedicada de carpetas, en tarjetas. Aqui vive TODA la
 // administracion (crear, renombrar, compartir, eliminar); en /proyectos
@@ -30,6 +32,7 @@ import { CompartirCarpetaDialogComponent } from '../../shared/components/compart
     MatTooltipModule,
     MatProgressSpinnerModule,
     MatDialogModule,
+    ColorPickerComponent,
   ],
   templateUrl: './carpetas.component.html',
   styleUrl: './carpetas.component.scss',
@@ -42,9 +45,24 @@ export class CarpetasComponent implements OnInit {
 
   creando = signal(false);
   nuevoNombre = '';
+  nuevoColor: string | null = null;
+
+  // Edicion inline por-card (nombre + color): solo una carpeta editable
+  // a la vez, identificada por id ya que esto es una lista, no un
+  // detalle de un solo elemento (a diferencia de proyecto-detalle).
+  editandoId = signal<string | null>(null);
+  edicionNombre = '';
+  edicionColor: string | null = null;
 
   propias = computed(() => this.folders().filter((f) => f.isOwner));
   compartidasConmigo = computed(() => this.folders().filter((f) => !f.isOwner));
+
+  // Texto blanco/oscuro segun el color de fondo elegido, para que el
+  // titulo siga siendo legible con cualquier tono de la paleta.
+  tituloTextColor = contrastTextColor;
+  // Color del banner superior de la card (estilo Google Classroom): el
+  // de la carpeta, o un azul por default si no eligio ninguno.
+  bannerColor = bannerColor;
 
   constructor(
     private folderService: FolderService,
@@ -65,7 +83,7 @@ export class CarpetasComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.errorMessage.set('No se pudieron cargar las carpetas.');
+        this.errorMessage.set('No se pudieron cargar las oficinas.');
         this.loading.set(false);
       },
     });
@@ -78,6 +96,7 @@ export class CarpetasComponent implements OnInit {
 
   toggleCrear(): void {
     this.nuevoNombre = '';
+    this.nuevoColor = null;
     this.creando.update((v) => !v);
   }
 
@@ -85,39 +104,55 @@ export class CarpetasComponent implements OnInit {
     const nombre = this.nuevoNombre.trim();
     if (!nombre) return;
 
-    this.folderService.create(nombre).subscribe({
+    this.folderService.create(nombre, this.nuevoColor).subscribe({
       next: (folder) => {
         this.folders.update((list) =>
           [...list, folder].sort((a, b) => a.name.localeCompare(b.name))
         );
         this.creando.set(false);
         this.nuevoNombre = '';
+        this.nuevoColor = null;
       },
-      error: () => this.errorMessage.set('No se pudo crear la carpeta.'),
+      error: () => this.errorMessage.set('No se pudo crear la oficina.'),
     });
   }
 
-  onRenombrar(folder: FolderDto): void {
-    const nombre = window.prompt('Nuevo nombre de la carpeta', folder.name)?.trim();
-    if (!nombre || nombre === folder.name) return;
+  // Edicion inline (nombre + color): reemplaza el viejo window.prompt,
+  // que no podia alojar un selector de color.
+  entrarEdicion(folder: FolderDto): void {
+    this.edicionNombre = folder.name;
+    this.edicionColor = folder.color;
+    this.editandoId.set(folder.id);
+  }
 
-    this.folderService.rename(folder.id, nombre).subscribe({
-      next: (actualizada) => this.reemplazar(actualizada),
-      error: () => this.errorMessage.set('No se pudo renombrar la carpeta.'),
+  cancelarEdicion(): void {
+    this.editandoId.set(null);
+  }
+
+  guardarEdicion(folder: FolderDto): void {
+    const nombre = this.edicionNombre.trim();
+    if (!nombre) return;
+
+    this.folderService.rename(folder.id, nombre, this.edicionColor).subscribe({
+      next: (actualizada) => {
+        this.reemplazar(actualizada);
+        this.editandoId.set(null);
+      },
+      error: () => this.errorMessage.set('No se pudo actualizar la oficina.'),
     });
   }
 
   // Borrar la carpeta NO borra los proyectos: quedan sin carpeta.
   onEliminar(folder: FolderDto): void {
     const ok = window.confirm(
-      `¿Eliminar la carpeta «${folder.name}»?\n\n` +
-        `Sus ${folder.projectCount} proyecto(s) NO se eliminan: quedan sin carpeta.`
+      `¿Eliminar la oficina «${folder.name}»?\n\n` +
+        `Sus ${folder.projectCount} proyecto(s) NO se eliminan: quedan sin oficina.`
     );
     if (!ok) return;
 
     this.folderService.delete(folder.id).subscribe({
       next: () => this.folders.update((list) => list.filter((f) => f.id !== folder.id)),
-      error: () => this.errorMessage.set('No se pudo eliminar la carpeta.'),
+      error: () => this.errorMessage.set('No se pudo eliminar la oficina.'),
     });
   }
 
@@ -153,13 +188,13 @@ export class CarpetasComponent implements OnInit {
         this.reemplazar(resultado.folder);
         this.errorMessage.set(null);
         this.mensajeExito.set(
-          `Carpeta compartida con ${resultado.folder.sharedWithFullName}. ` +
+          `Oficina compartida con ${resultado.folder.sharedWithFullName}. ` +
             `Se reasignaron ${resultado.reassignedTasks} tarea(s).`
         );
       },
       error: (err) =>
         this.errorMessage.set(
-          typeof err?.error === 'string' ? err.error : 'No se pudo compartir la carpeta.'
+          typeof err?.error === 'string' ? err.error : 'No se pudo compartir la oficina.'
         ),
     });
   }
@@ -174,7 +209,7 @@ export class CarpetasComponent implements OnInit {
 
     this.folderService.share(folder.id, null).subscribe({
       next: (resultado) => this.reemplazar(resultado.folder),
-      error: () => this.errorMessage.set('No se pudo dejar de compartir la carpeta.'),
+      error: () => this.errorMessage.set('No se pudo dejar de compartir la oficina.'),
     });
   }
 

@@ -1,5 +1,16 @@
-.shell-container {
+// Columna: topbar (alto fijo, ver topbar.component.scss) arriba, el
+// sidenav+contenido ocupando el resto de la altura debajo.
+.shell-root {
   height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell-container {
+  // Antes era 100vh fijo; ahora el alto lo da .shell-root y esto solo
+  // reparte el espacio restante debajo de la topbar.
+  flex: 1;
+  min-height: 0;
   // mat-sidenav-container pinta su propio fondo (el color "surface" del
   // tema Material) encima del body, asi que hay que forzarlo aca para
   // que el nuevo --app-bg se vea: el shell entero es "chrome", no una

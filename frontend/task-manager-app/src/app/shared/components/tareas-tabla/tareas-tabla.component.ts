@@ -77,7 +77,13 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
 
   private coincideBusqueda = (data: FilaTarea): boolean => {
     if (!this.terminoBusqueda) return true;
-    const campos = [data.title, data.projectName, data.assignedToFullName, data.createdByFullName];
+    const campos = [
+      data.title,
+      data.projectName,
+      data.folderName,
+      data.assignedToFullName,
+      data.createdByFullName,
+    ];
     return campos.some((c) => (c ?? '').toLowerCase().includes(this.terminoBusqueda));
   };
 
@@ -88,14 +94,15 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
   // Misma regla que TareaCardComponent.puedeCambiarA (ver ese
   // componente para el detalle de las reglas de negocio): quien creo la
   // tarea puede moverla a cualquier estado; quien la tiene asignada
-  // solo entre En atencion/Atendida; nadie mas puede tocarla desde aca.
+  // solo entre En atencion/Atendida/Volver a revisar; nadie mas puede
+  // tocarla desde aca.
   private opcionesEstadoPermitidas(task: TaskItemDto): TaskItemStatus[] {
     const uid = this.currentUserId;
     if (uid !== null && task.createdById === uid) {
       return Object.values(TaskItemStatus).filter((v) => typeof v === 'number') as TaskItemStatus[];
     }
     if (uid !== null && task.assignedToId === uid) {
-      return [TaskItemStatus.EnAtencion, TaskItemStatus.Atendida];
+      return [TaskItemStatus.EnAtencion, TaskItemStatus.Atendida, TaskItemStatus.VolverARevisar];
     }
     return [];
   }
@@ -138,9 +145,25 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
 
     const columns: ColumnDefinition[] = [
       {
+        // Sin encabezado visible (solo tooltip): con dos iconos de ~20px
+        // la columna es demasiado angosta para un titulo legible, y el
+        // clip/globo se entienden solos (mismo patron que la bandeja de
+        // Gmail). Tampoco se ordena por aca: "cuantos adjuntos tiene"
+        // no es un criterio util para buscar una tarea.
+        title: '',
+        headerTooltip: 'Adjuntos y comentarios',
+        headerSort: false,
+        width: 84,
+        hozAlign: 'center',
+        field: 'attachmentCount',
+        formatter: (cell: CellComponent) =>
+          this.formatIndicadores(cell.getRow().getData() as TaskItemDto),
+        cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
+      },
+      {
         title: 'Tarea',
         field: 'title',
-        widthGrow: 2,
+        widthGrow: 3,
         // Estilo "enlace" (ver .tabulator-cell[tabulator-field='title']
         // en el scss): es la unica celda que deja claro a simple vista
         // que la fila entera es clicable.
@@ -152,7 +175,16 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
             {
               title: 'Proyecto',
               field: 'projectName',
-              formatter: (cell: CellComponent) => cell.getValue() ?? 'Tarea suelta',
+              formatter: (cell: CellComponent) =>
+                this.formatProyecto(cell.getRow().getData() as TaskItemDto),
+              cellClick: (_e: UIEvent, cell: CellComponent) =>
+                this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
+            } as ColumnDefinition,
+            {
+              title: 'Oficina',
+              field: 'folderName',
+              formatter: (cell: CellComponent) =>
+                this.formatOficina(cell.getRow().getData() as TaskItemDto),
               cellClick: (_e: UIEvent, cell: CellComponent) =>
                 this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
             } as ColumnDefinition,
@@ -172,12 +204,19 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
       {
         title: 'Asignada a',
         field: 'assignedToFullName',
-        formatter: (cell: CellComponent) => cell.getValue() ?? 'Sin asignar',
+        widthGrow: 1,
+        // Escapado a mano: tener formatter propio (aunque sea solo para
+        // el "Sin asignar") hace que Tabulator deje de sanear el valor,
+        // a diferencia de "Creada por" aca abajo, que al no tener
+        // formatter pasa por el "plaintext" que si sanea. Ver escaparHtml.
+        formatter: (cell: CellComponent) =>
+          this.escaparHtml((cell.getValue() as string | null) ?? 'Sin asignar'),
         cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
       },
       {
         title: 'Creada por',
         field: 'createdByFullName',
+        widthGrow: 1,
         cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
       },
       {
@@ -218,16 +257,23 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
         },
       },
       {
+        title: 'Fecha límite',
+        field: 'fechaLimite',
+        formatter: (cell: CellComponent) => this.formatFechaLimite(cell.getValue()),
+        sorter: this.sorterFecha,
+        cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
+      },
+      {
         title: 'Creada',
         field: 'createdAt',
         formatter: (cell: CellComponent) => this.formatFecha(cell.getValue()),
-        sorter: 'datetime',
+        sorter: this.sorterFecha,
       },
       {
         title: 'Último cambio de estado',
         field: 'lastStatusChangeAt',
         formatter: (cell: CellComponent) => this.formatFecha(cell.getValue()),
-        sorter: 'datetime',
+        sorter: this.sorterFecha,
       },
     ];
 
@@ -279,6 +325,18 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
     this.tabulator.setFilter(this.coincideBusqueda);
   }
 
+  // Reemplaza al sorter 'datetime' de Tabulator: ese depende de luxon
+  // (table.dependencyRegistry.lookup(["luxon", "DateTime"])) para
+  // funcionar, y este proyecto no lo tiene instalado - sin luxon, el
+  // comparador de Tabulator ni siquiera tira excepcion, solo loguea
+  // "Sort Error" en consola y devuelve undefined, que JS trata como
+  // "iguales" (nunca reordena nada). Un comparador propio evita meter
+  // luxon como dependencia solo por esto. Los nulos (fechaLimite sin
+  // elegir) se tratan como epoch, quedan primero en ascendente.
+  private sorterFecha = (a: string | null, b: string | null): number => {
+    return new Date(a ?? 0).getTime() - new Date(b ?? 0).getTime();
+  };
+
   private formatFecha(iso: string | null | undefined): string {
     if (!iso) return '—';
     return new Date(iso).toLocaleString('es-MX', {
@@ -287,6 +345,24 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+    });
+  }
+
+  // A diferencia de formatFecha (un timestamp real), fechaLimite es solo
+  // una fecha de calendario elegida en un <input type="date"> (sin hora).
+  // El backend la guarda/regresa como medianoche UTC (mismo mecanismo que
+  // el resto de los DateTime, ver AppDbContext) - formatear con
+  // toLocaleString normal la mostraria un dia antes para cualquiera en
+  // UTC-6 (Mexico), porque medianoche UTC ya es la tarde del dia
+  // anterior en hora local. timeZone: 'UTC' evita esa conversion y
+  // muestra tal cual el dia que se eligio.
+  private formatFechaLimite(iso: string | null | undefined): string {
+    if (!iso) return 'Sin fecha límite';
+    return new Date(iso).toLocaleDateString('es-MX', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
     });
   }
 
@@ -306,5 +382,79 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
     };
     const label = TASK_STATUS_LABELS[status];
     return `<span class="badge-estado ${clases[status]}">${label}</span>`;
+  }
+
+  // OBLIGATORIO para cualquier texto que venga de la BD y termine dentro
+  // de un formatter de estos. Cuando un formatter custom devuelve un
+  // string, Tabulator lo mete con `element.innerHTML = val` SIN sanear
+  // (solo su formatter "plaintext" por default sanea, ver
+  // Format/defaults/formatters/plaintext.js). Sin esto, un proyecto u
+  // oficina llamado `<img src=x onerror=...>` ejecutaria script en el
+  // navegador de cualquiera que viera esa tarea en la tabla.
+  //
+  // Angular no ayuda aca: su sanitizacion cubre [innerHTML] en sus
+  // propios templates (ver la descripcion en tarea-card), no el HTML que
+  // una libreria externa escribe por su cuenta en el DOM.
+  private escaparHtml(valor: string): string {
+    return valor
+      .replace(/&/g, '&amp;') // primero, si no re-escapa las entidades de abajo
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Punto de color con el color del proyecto padre (la tarea no tiene
+  // color propio) - mismo patron de HTML crudo que badgeEstado, porque
+  // Tabulator renderiza fuera del binding de Angular y el color es un
+  // valor dinamico por fila, no una clase fija.
+  private formatProyecto(task: TaskItemDto): string {
+    const dot = task.projectColor
+      ? `<span class="proyecto-celda__dot" style="background-color:${this.escaparHtml(task.projectColor)}"></span>`
+      : '';
+    const nombre = this.escaparHtml(task.projectName ?? 'Tarea suelta');
+    return `<span class="proyecto-celda">${dot}${nombre}</span>`;
+  }
+
+  // Iconos de "tiene adjuntos" / "tiene comentarios", con el numero al
+  // lado para no tener que abrir la tarea para saber si es 1 o 12. Celda
+  // vacia cuando no hay ninguno de los dos: solo se pinta lo que existe,
+  // asi el clip/globo resaltan en vez de perderse entre iconos apagados.
+  //
+  // Se interpolan unicamente numeros (los conteos), nunca texto escrito
+  // por alguien - esto se inyecta como HTML crudo, ver badgeEstado.
+  private formatIndicadores(task: TaskItemDto): string {
+    const partes: string[] = [];
+
+    if (task.attachmentCount > 0) {
+      const etiqueta = task.attachmentCount === 1 ? '1 archivo adjunto' : `${task.attachmentCount} archivos adjuntos`;
+      partes.push(
+        `<span class="indicador" title="${etiqueta}">` +
+          `<span class="material-icons indicador__icono">attach_file</span>` +
+          `${task.attachmentCount}</span>`
+      );
+    }
+
+    if (task.commentCount > 0) {
+      const etiqueta = task.commentCount === 1 ? '1 comentario' : `${task.commentCount} comentarios`;
+      partes.push(
+        `<span class="indicador" title="${etiqueta}">` +
+          `<span class="material-icons indicador__icono">chat_bubble_outline</span>` +
+          `${task.commentCount}</span>`
+      );
+    }
+
+    return `<span class="indicadores">${partes.join('')}</span>`;
+  }
+
+  // Mismo patron que formatProyecto: la oficina es la del proyecto
+  // padre (Project.Folder), la tarea no tiene ninguna propia. Vacio
+  // tanto para tareas sueltas como para proyectos sin oficina asignada.
+  private formatOficina(task: TaskItemDto): string {
+    if (!task.folderName) return 'Sin oficina';
+    const dot = task.folderColor
+      ? `<span class="proyecto-celda__dot" style="background-color:${this.escaparHtml(task.folderColor)}"></span>`
+      : '';
+    return `<span class="proyecto-celda">${dot}${this.escaparHtml(task.folderName)}</span>`;
   }
 }

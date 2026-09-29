@@ -4,6 +4,7 @@ import { Subject } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 import { TaskItemDto } from './task.service';
+import { CommentDeletedDto, TaskCommentDto } from './task-comment.service';
 
 // Conexion SignalR para recibir cambios de tareas en vivo. El hub
 // (TaskHub en el backend) es de "solo escucha": nunca se le pide que
@@ -24,6 +25,13 @@ export class RealtimeService {
 
   readonly taskChanged$ = new Subject<TaskItemDto>();
 
+  // Comentarios en vivo (ver TaskCommentsController.NotificarComentario):
+  // mismos grupos que taskChanged$ (proyecto del creador/asignado), asi
+  // que llegan a cualquiera con esa tarea a la vista, no solo a quien
+  // escribio el comentario.
+  readonly commentAdded$ = new Subject<TaskCommentDto>();
+  readonly commentDeleted$ = new Subject<CommentDeletedDto>();
+
   // Idempotente: si ya esta conectado o conectandose, no hace nada.
   // Se llama una vez desde AppShellComponent (cubre cualquier pantalla
   // autenticada), no desde cada componente que necesita los eventos.
@@ -41,13 +49,21 @@ export class RealtimeService {
         // personalizados, asi que el cliente de SignalR lo manda como
         // query string "access_token" (el backend lo acepta ahi, ver
         // Program.cs / MockAuthHandler, solo para rutas "/hubs").
-        accessTokenFactory: () => this.auth.getToken() ?? '',
+        accessTokenFactory: () => this.auth.getToken(),
       })
       .withAutomaticReconnect()
       .build();
 
     this.connection.on('TaskChanged', (task: TaskItemDto) => {
       this.taskChanged$.next(task);
+    });
+
+    this.connection.on('CommentAdded', (comment: TaskCommentDto) => {
+      this.commentAdded$.next(comment);
+    });
+
+    this.connection.on('CommentDeleted', (payload: CommentDeletedDto) => {
+      this.commentDeleted$.next(payload);
     });
 
     try {

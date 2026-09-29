@@ -1,14 +1,14 @@
 <div class="carpetas-page">
   <header class="carpetas-header">
     <div>
-      <h1>Carpetas</h1>
+      <h1>Oficinas</h1>
       <p class="carpetas-subtitle">Organiza tus proyectos y compártelos con tu equipo.</p>
     </div>
 
     @if (!creando()) {
       <button mat-flat-button (click)="toggleCrear()">
         <mat-icon>create_new_folder</mat-icon>
-        Nueva carpeta
+        Nueva oficina
       </button>
     }
   </header>
@@ -18,10 +18,11 @@
       <input
         class="crear-input"
         [(ngModel)]="nuevoNombre"
-        placeholder="Nombre de la carpeta"
+        placeholder="Nombre de la oficina"
         (keyup.enter)="onCrear()"
         (keyup.escape)="toggleCrear()"
       />
+      <app-color-picker [(ngModel)]="nuevoColor" label="Color (opcional)" />
       <div class="crear-acciones">
         <button mat-button (click)="toggleCrear()">Cancelar</button>
         <button mat-flat-button [disabled]="!nuevoNombre.trim()" (click)="onCrear()">Crear</button>
@@ -39,84 +40,119 @@
   @if (loading()) {
     <div class="estado">
       <mat-spinner diameter="32"></mat-spinner>
-      <p>Cargando carpetas…</p>
+      <p>Cargando oficinas…</p>
     </div>
   } @else if (folders().length === 0) {
     <div class="estado">
       <mat-icon class="estado__icono">folder_open</mat-icon>
-      <p>Todavía no tienes carpetas. Crea la primera para agrupar tus proyectos.</p>
+      <p>Todavía no tienes oficinas. Crea la primera para agrupar tus proyectos.</p>
     </div>
   } @else {
     @if (propias().length > 0) {
-      <h2 class="seccion">Mis carpetas</h2>
+      <h2 class="seccion">Mis oficinas</h2>
       <div class="carpetas-grid">
         @for (folder of propias(); track folder.id) {
           <mat-card class="carpeta-card">
-            <div class="carpeta-card__head">
-              <mat-icon class="carpeta-card__icono">
-                {{ folder.sharedWithId ? 'folder_shared' : 'folder' }}
-              </mat-icon>
-              <h3 class="carpeta-card__nombre">{{ folder.name }}</h3>
-
-              <button
-                mat-icon-button
-                [matMenuTriggerFor]="menu"
-                [attr.aria-label]="'Opciones de ' + folder.name"
-              >
-                <mat-icon>more_vert</mat-icon>
-              </button>
-
-              <mat-menu #menu="matMenu">
-                <button mat-menu-item (click)="onRenombrar(folder)">
-                  <mat-icon>edit</mat-icon>
-                  Renombrar
-                </button>
-                <button mat-menu-item (click)="onCompartir(folder)">
-                  <mat-icon>person_add</mat-icon>
-                  {{ folder.sharedWithId ? 'Cambiar con quién se comparte' : 'Compartir…' }}
-                </button>
-                @if (folder.sharedWithId) {
-                  <button mat-menu-item (click)="onDejarDeCompartir(folder)">
-                    <mat-icon>person_remove</mat-icon>
-                    Dejar de compartir
+            @if (editandoId() === folder.id) {
+              <div class="editar-form">
+                <input
+                  class="crear-input"
+                  [(ngModel)]="edicionNombre"
+                  placeholder="Nombre de la oficina"
+                  (keyup.enter)="guardarEdicion(folder)"
+                  (keyup.escape)="cancelarEdicion()"
+                />
+                <app-color-picker [(ngModel)]="edicionColor" label="Color (opcional)" />
+                <div class="editar-acciones">
+                  <button mat-button (click)="cancelarEdicion()">Cancelar</button>
+                  <button
+                    mat-flat-button
+                    [disabled]="!edicionNombre.trim()"
+                    (click)="guardarEdicion(folder)"
+                  >
+                    Guardar
                   </button>
-                }
-                <button mat-menu-item (click)="onEliminar(folder)">
-                  <mat-icon>delete_outline</mat-icon>
-                  Eliminar carpeta
-                </button>
-              </mat-menu>
-            </div>
-
-            <div class="carpeta-card__stats">
-              <span class="stat">
-                <strong>{{ folder.projectCount }}</strong>
-                proyecto{{ folder.projectCount === 1 ? '' : 's' }}
-              </span>
-              <span class="stat">
-                <strong>{{ folder.taskCount }}</strong>
-                tarea{{ folder.taskCount === 1 ? '' : 's' }}
-              </span>
-            </div>
-
-            @if (folder.sharedWithFullName) {
-              <div class="compartida">
-                <mat-icon inline>person</mat-icon>
-                Compartida con <strong>{{ folder.sharedWithFullName }}</strong>
+                </div>
               </div>
             } @else {
-              <div class="compartida compartida--no">
-                <mat-icon inline>lock</mat-icon>
-                Solo tú
+              <div
+                class="carpeta-card__banner"
+                [style.background-color]="bannerColor(folder.color)"
+                [style.color]="tituloTextColor(bannerColor(folder.color))"
+              >
+                <mat-icon class="carpeta-card__icono">
+                  {{ folder.sharedWithId ? 'folder_shared' : 'folder' }}
+                </mat-icon>
+                <h3 class="carpeta-card__nombre">{{ folder.name }}</h3>
+
+                <button
+                  mat-icon-button
+                  class="carpeta-card__menu-btn"
+                  [matMenuTriggerFor]="menu"
+                  [attr.aria-label]="'Opciones de ' + folder.name"
+                >
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+
+                <mat-menu #menu="matMenu">
+                  <button mat-menu-item (click)="entrarEdicion(folder)">
+                    <mat-icon>edit</mat-icon>
+                    Editar
+                  </button>
+                  <button mat-menu-item (click)="onCompartir(folder)">
+                    <mat-icon>person_add</mat-icon>
+                    {{ folder.sharedWithId ? 'Cambiar con quién se comparte' : 'Compartir…' }}
+                  </button>
+                  @if (folder.sharedWithId) {
+                    <button mat-menu-item (click)="onDejarDeCompartir(folder)">
+                      <mat-icon>person_remove</mat-icon>
+                      Dejar de compartir
+                    </button>
+                  }
+                  <button mat-menu-item (click)="onEliminar(folder)">
+                    <mat-icon>delete_outline</mat-icon>
+                    Eliminar oficina
+                  </button>
+                </mat-menu>
+              </div>
+
+              <div class="carpeta-card__body">
+                <div class="carpeta-card__stats">
+                  <span class="stat">
+                    <strong>{{ folder.projectCount }}</strong>
+                    proyecto{{ folder.projectCount === 1 ? '' : 's' }}
+                  </span>
+                  <span class="stat">
+                    <strong>{{ folder.taskCount }}</strong>
+                    tarea{{ folder.taskCount === 1 ? '' : 's' }}
+                  </span>
+                </div>
+
+                @if (folder.sharedWithFullName) {
+                  <div class="compartida">
+                    <mat-icon inline>person</mat-icon>
+                    Compartida con <strong>{{ folder.sharedWithFullName }}</strong>
+                  </div>
+                } @else {
+                  <div class="compartida compartida--no">
+                    <mat-icon inline>lock</mat-icon>
+                    Solo tú
+                  </div>
+                }
+
+                <div class="carpeta-card__acciones">
+                  <button
+                    mat-stroked-button
+                    class="carpeta-card__ver-btn"
+                    [style.--btn-color]="bannerColor(folder.color)"
+                    (click)="verProyectos(folder)"
+                  >
+                    Ver proyectos
+                    <mat-icon iconPositionEnd>arrow_forward</mat-icon>
+                  </button>
+                </div>
               </div>
             }
-
-            <div class="carpeta-card__acciones">
-              <button mat-stroked-button (click)="verProyectos(folder)">
-                Ver proyectos
-                <mat-icon iconPositionEnd>arrow_forward</mat-icon>
-              </button>
-            </div>
           </mat-card>
         }
       </div>
@@ -127,32 +163,43 @@
       <div class="carpetas-grid">
         @for (folder of compartidasConmigo(); track folder.id) {
           <mat-card class="carpeta-card carpeta-card--ajena">
-            <div class="carpeta-card__head">
+            <div
+              class="carpeta-card__banner"
+              [style.background-color]="bannerColor(folder.color)"
+              [style.color]="tituloTextColor(bannerColor(folder.color))"
+            >
               <mat-icon class="carpeta-card__icono">folder_shared</mat-icon>
               <h3 class="carpeta-card__nombre">{{ folder.name }}</h3>
             </div>
 
-            <div class="carpeta-card__stats">
-              <span class="stat">
-                <strong>{{ folder.projectCount }}</strong>
-                proyecto{{ folder.projectCount === 1 ? '' : 's' }}
-              </span>
-              <span class="stat">
-                <strong>{{ folder.taskCount }}</strong>
-                tarea{{ folder.taskCount === 1 ? '' : 's' }}
-              </span>
-            </div>
+            <div class="carpeta-card__body">
+              <div class="carpeta-card__stats">
+                <span class="stat">
+                  <strong>{{ folder.projectCount }}</strong>
+                  proyecto{{ folder.projectCount === 1 ? '' : 's' }}
+                </span>
+                <span class="stat">
+                  <strong>{{ folder.taskCount }}</strong>
+                  tarea{{ folder.taskCount === 1 ? '' : 's' }}
+                </span>
+              </div>
 
-            <div class="compartida">
-              <mat-icon inline>person</mat-icon>
-              De <strong>{{ folder.ownerFullName }}</strong>
-            </div>
+              <div class="compartida">
+                <mat-icon inline>person</mat-icon>
+                De <strong>{{ folder.ownerFullName }}</strong>
+              </div>
 
-            <div class="carpeta-card__acciones">
-              <button mat-stroked-button (click)="verProyectos(folder)">
-                Ver proyectos
-                <mat-icon iconPositionEnd>arrow_forward</mat-icon>
-              </button>
+              <div class="carpeta-card__acciones">
+                <button
+                  mat-stroked-button
+                  class="carpeta-card__ver-btn"
+                  [style.--btn-color]="bannerColor(folder.color)"
+                  (click)="verProyectos(folder)"
+                >
+                  Ver proyectos
+                  <mat-icon iconPositionEnd>arrow_forward</mat-icon>
+                </button>
+              </div>
             </div>
           </mat-card>
         }

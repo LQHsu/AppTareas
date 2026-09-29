@@ -61,8 +61,28 @@ export class AuthService {
     this.keycloak.logout({ redirectUri: window.location.origin });
   }
 
-  getToken(): string | undefined {
-    return environment.useMockAuth ? this.mockToken : this.keycloak.token;
+  // Async a proposito: keycloak-js NUNCA refresca el access token solo,
+  // asi que sin esto cada request seguiria mandando el mismo JWT desde
+  // el login hasta que expirara (accessTokenLifespan = 300s en el
+  // realm) - a partir de ahi el backend rechaza todo con 401 y la app
+  // se queda "sin poder cargar nada" hasta un F5 (que vuelve a
+  // autenticar desde cero via check-sso). updateToken(30) refresca solo
+  // si al token le quedan menos de 30s de vida; si ya esta vigente no
+  // hace ninguna llamada de red.
+  async getToken(): Promise<string> {
+    if (environment.useMockAuth) return this.mockToken;
+
+    try {
+      await this.keycloak.updateToken(30);
+    } catch {
+      // El refresh token tambien expiro (idle timeout / maximo de
+      // sesion en el realm) - no hay nada que refrescar, hay que
+      // volver a loguear.
+      this.keycloak.login();
+      return '';
+    }
+
+    return this.keycloak.token ?? '';
   }
 
   getUserId(): string | undefined {

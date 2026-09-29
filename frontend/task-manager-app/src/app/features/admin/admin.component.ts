@@ -36,7 +36,7 @@ export class AdminComponent implements OnInit {
 
   errorMessage = signal<string | null>(null);
 
-  userColumns = ['fullName', 'email', 'area', 'superAdmin', 'banned'];
+  userColumns = ['fullName', 'email', 'area', 'superAdmin', 'coordinador', 'banned'];
   projectColumns = ['name', 'area', 'owner', 'members', 'tasks', 'createdAt'];
 
   constructor(
@@ -97,9 +97,26 @@ export class AdminComponent implements OnInit {
         this.updatingUserId.set(null);
         this.errorMessage.set(
           err?.status === 400
-            ? 'No puedes quitarte a ti mismo: eres el único super admin que queda.'
+            ? 'No puedes quitarte a ti mismo el rol de super admin.'
             : 'No se pudo actualizar el usuario.'
         );
+      },
+    });
+  }
+
+  onToggleCoordinador(user: UserDto, event: MatSlideToggleChange): void {
+    const newValue = event.checked;
+    this.updatingUserId.set(user.id);
+
+    this.adminService.setCoordinador(user.id, newValue).subscribe({
+      next: (updated) => {
+        this.users.update((list) => list.map((u) => (u.id === updated.id ? updated : u)));
+        this.updatingUserId.set(null);
+      },
+      error: () => {
+        event.source.checked = user.isCoordinador;
+        this.updatingUserId.set(null);
+        this.errorMessage.set('No se pudo actualizar el usuario.');
       },
     });
   }

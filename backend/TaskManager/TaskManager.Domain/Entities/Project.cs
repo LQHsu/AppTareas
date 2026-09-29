@@ -5,7 +5,11 @@ public class Project
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
- 
+
+    // Color elegido por el dueno para distinguir el proyecto (hex, ej.
+    // "#3B82F6"). Independiente del color de Folder: no se hereda.
+    public string? Color { get; set; }
+
     // El proyecto pertenece a un area especifica; solo usuarios de esa
     // misma area pueden ser invitados como miembros (regla de negocio,
     // se valida en el servicio de aplicacion, no aqui).

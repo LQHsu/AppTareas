@@ -1,0 +1,75 @@
+.color-picker__label {
+  display: block;
+  font-size: 12px;
+  color: var(--app-text-muted);
+  margin-bottom: 6px;
+}
+
+.color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  cursor: pointer;
+  background: var(--app-surface-subtle);
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover:not(:disabled) {
+    transform: scale(1.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--app-blue);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+.swatch--selected {
+  border-color: var(--app-text);
+  box-shadow: 0 0 0 2px #ffffff inset;
+}
+
+.swatch--ninguno {
+  background: var(--app-surface-subtle);
+  color: var(--app-text-muted);
+  border: 2px dashed var(--app-border-strong);
+}
+
+.swatch--personalizado {
+  color: #ffffff;
+}
+
+// input[type=color] nativo: no se ve, solo se usa por su selector de
+// color propio del sistema operativo/navegador. Se dispara con
+// colorInput.click() desde el swatch "Personalizado".
+.color-picker__input-nativo {
+  position: absolute;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}

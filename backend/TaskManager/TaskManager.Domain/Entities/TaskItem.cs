@@ -37,7 +37,12 @@ public class TaskItem
     public DateTime? FechaAsignacion { get; set; }
     public DateTime? FechaAtencion { get; set; }
     public DateTime? FechaTerminacion { get; set; }
- 
+
+    // Fecha limite elegida a mano por quien crea/edita la tarea (no
+    // automatica como las de arriba). Puramente informativa: no bloquea
+    // ninguna accion ni cambia el flujo de estados, solo se muestra.
+    public DateTime? FechaLimite { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
  

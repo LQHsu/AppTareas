@@ -40,6 +40,10 @@ export class AdminService {
     return this.http.patch<UserDto>(`${this.baseUrl}/users/${userId}/ban`, { isBanned });
   }
 
+  setCoordinador(userId: string, isCoordinador: boolean): Observable<UserDto> {
+    return this.http.patch<UserDto>(`${this.baseUrl}/users/${userId}/coordinador`, { isCoordinador });
+  }
+
   getAllProjects(): Observable<AdminProjectDto[]> {
     return this.http.get<AdminProjectDto[]>(`${this.baseUrl}/projects`);
   }

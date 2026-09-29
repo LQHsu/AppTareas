@@ -69,11 +69,13 @@ Reglas de negocio clave:
       **dueño del proyecto**, que cuenta como creador para este efecto
       aunque no haya creado esa tarea puntual). Existen para poder
       corregir un error, no para uso normal.
-    - `EnAtencion`/`Atendida`: quien tiene la tarea **asignada**, o quien
-      la creó.
-    - `VolverARevisar`/`Terminada`/`Cancelada`: solo quien creó la tarea
-      (o el dueño del proyecto) — evaluar y cerrar el trabajo es su
-      decisión.
+    - `EnAtencion`/`Atendida`/`VolverARevisar`: quien tiene la tarea
+      **asignada**, o quien la creó — es el ida-y-vuelta del avance del
+      trabajo (el creador manda a "Volver a revisar" cuando no quedó
+      bien, y el asignado necesita poder mandarla de vuelta el mismo
+      camino después de corregirla, no solo saltar directo a Atendida).
+    - `Terminada`/`Cancelada`: solo quien creó la tarea (o el dueño del
+      proyecto) — cerrar el trabajo es su decisión.
     - Un miembro del proyecto que no es ni creador ni asignado de una
       tarea puntual puede **verla** pero no puede cambiar su estado en
       absoluto (antes cualquier miembro podía).
@@ -654,6 +656,23 @@ Reglas de negocio clave:
       HTTP en `localhost:5168`, válido para dev pero no configurado).
 - [ ] Quitar/mover archivos de ejemplo si quedó alguno de la plantilla
       default (`WeatherForecast.cs` ya se eliminó).
+- [ ] PWA instalable (evaluada, no implementada — decisión pendiente).
+      Hoy no hay nada de PWA en el proyecto (sin `manifest.webmanifest`,
+      sin service worker, sin `@angular/pwa`). Si se decide hacerlo:
+      - `ng add @angular/pwa` — genera `public/manifest.webmanifest`
+        (nombre, colores, ícono, `display: standalone`), el service
+        worker (`ngsw-worker.js`) que cachea los assets del build, los
+        `<link>`/`<meta>` en `index.html`, y registra
+        `provideServiceWorker` en el bootstrap.
+      - Generar íconos en varios tamaños (192x192, 512x512, maskable) a
+        partir del logo — hoy solo existe `favicon.ico`.
+      - Requiere HTTPS en producción (los service workers no funcionan
+        por HTTP salvo `localhost`) — depende del punto de deploy real
+        con SSL de arriba en esta misma lista.
+      - Revisar `ngsw-config.json` (el que genera el schematic por
+        default) para que el service worker NO cachee el flujo de
+        Keycloak (`silent-check-sso.html`, redirects de login/logout).
+      - No toca nada del backend.
 
 ## Configuración / credenciales (placeholders — verificar valores reales en el proyecto)
 

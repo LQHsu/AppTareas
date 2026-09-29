@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.DTOs;
 using TaskManager.Domain.Entities;
-using TaskManager.Domain.Enums;
 using TaskManager.Infrastructure;
 
 namespace TaskManager.Api.Controllers;
@@ -53,7 +52,8 @@ public class FoldersController : ControllerBase
                 f.CreatedAt,
                 f.Projects.Count,
                 f.Projects.SelectMany(p => p.Tasks).Count(),
-                f.OwnerId == userId
+                f.OwnerId == userId,
+                f.Color
             ))
             .ToListAsync();
 
@@ -71,11 +71,13 @@ public class FoldersController : ControllerBase
 
         var name = dto.Name?.Trim() ?? string.Empty;
         if (name.Length == 0) return BadRequest("El nombre de la carpeta no puede estar vacio.");
+        if (!ColorValidation.IsValidHex(dto.Color)) return BadRequest("El color no es un codigo hexadecimal valido.");
 
         var folder = new ProjectFolder
         {
             Id = Guid.NewGuid(),
             Name = name,
+            Color = dto.Color,
             OwnerId = userId,
             CreatedAt = DateTime.UtcNow,
         };
@@ -98,8 +100,10 @@ public class FoldersController : ControllerBase
 
         var name = dto.Name?.Trim() ?? string.Empty;
         if (name.Length == 0) return BadRequest("El nombre de la carpeta no puede estar vacio.");
+        if (!ColorValidation.IsValidHex(dto.Color)) return BadRequest("El color no es un codigo hexadecimal valido.");
 
         folder.Name = name;
+        folder.Color = dto.Color;
         await _db.SaveChangesAsync();
 
         return Ok(await BuildDto(folder, userId));
@@ -164,67 +168,7 @@ public class FoldersController : ControllerBase
         if (target.AreaId != owner.AreaId)
             return BadRequest("Solo puedes compartir carpetas con personas de tu misma area.");
 
-        var projectIds = folder.Projects.Select(p => p.Id).ToList();
-
-        // 1) Acceso: agregar como miembro donde no lo sea todavia.
-        if (projectIds.Count > 0)
-        {
-            var yaMiembroEn = await _db.ProjectMembers
-                .Where(m => projectIds.Contains(m.ProjectId) && m.UserId == target.Id)
-                .Select(m => m.ProjectId)
-                .ToListAsync();
-
-            foreach (var projectId in projectIds.Except(yaMiembroEn))
-            {
-                _db.ProjectMembers.Add(new ProjectMember
-                {
-                    ProjectId = projectId,
-                    UserId = target.Id,
-                    JoinedAt = DateTime.UtcNow,
-                });
-            }
-        }
-
-        // 2) Reasignacion masiva. Incluye subtareas (tambien tienen
-        // ProjectId) y tareas ya terminadas o canceladas: se pidio
-        // explicitamente reasignar TODAS las de la carpeta.
-        var ahora = DateTime.UtcNow;
-        var tasks = await _db.Tasks
-            .Where(t => t.ProjectId.HasValue && projectIds.Contains(t.ProjectId.Value))
-            .ToListAsync();
-
-        var reasignadas = 0;
-
-        foreach (var task in tasks)
-        {
-            if (task.AssignedToId == target.Id) continue;
-
-            task.AssignedToId = target.Id;
-            task.FechaAsignacion = ahora;
-            task.UpdatedAt = ahora;
-            reasignadas++;
-
-            // Mismo comportamiento que PATCH /tasks/{id}/assign: una
-            // tarea que seguia en Creada pasa a Asignada, con bitacora.
-            if (task.Status == TaskItemStatus.Creada)
-            {
-                var oldStatus = task.Status;
-                task.Status = TaskItemStatus.Asignada;
-
-                _db.TaskStatusHistories.Add(new TaskStatusHistory
-                {
-                    Id = Guid.NewGuid(),
-                    TaskId = task.Id,
-                    ChangedById = userId,
-                    OldStatus = oldStatus,
-                    NewStatus = task.Status,
-                    ChangedAt = ahora,
-                });
-            }
-        }
-
-        folder.SharedWithId = target.Id;
-        folder.SharedAt = ahora;
+        var reasignadas = await FolderSharing.ShareAsync(_db, folder, target, userId);
 
         await _db.SaveChangesAsync();
 
@@ -254,7 +198,7 @@ public class FoldersController : ControllerBase
         int taskCount,
         bool isOwner) =>
         new(f.Id, f.Name, f.OwnerId, ownerName, f.SharedWithId, sharedWithName, f.SharedAt,
-            f.CreatedAt, projectCount, taskCount, isOwner);
+            f.CreatedAt, projectCount, taskCount, isOwner, f.Color);
 
     private string GetUserIdFromToken()
     {

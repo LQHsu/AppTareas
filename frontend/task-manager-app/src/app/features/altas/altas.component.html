@@ -1,0 +1,182 @@
+<div class="altas-page">
+  <header class="altas-header">
+    <h1>Dar de alta</h1>
+    <p class="altas-lede">
+      Solo las personas con número económico dado de alta aquí pueden entrar a la app. Se
+      asignan automáticamente a tu misma área.
+    </p>
+  </header>
+
+  @if (errorMessage()) {
+    <p class="altas-error">{{ errorMessage() }}</p>
+  }
+
+  <form class="altas-form" [formGroup]="form" (ngSubmit)="onSubmit()">
+    <mat-form-field appearance="outline" class="altas-input">
+      <mat-label>Número económico</mat-label>
+      <input matInput formControlName="numeroEconomico" placeholder="Ej. 12345" />
+      @if (form.get('numeroEconomico')?.hasError('required') && form.get('numeroEconomico')?.touched) {
+        <mat-error>Requerido</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="altas-input">
+      <mat-label>Oficina (opcional)</mat-label>
+      <mat-select formControlName="oficinaId">
+        <mat-option [value]="null">Sin oficina</mat-option>
+        @for (oficina of oficinas(); track oficina.id) {
+          <mat-option [value]="oficina.id">{{ oficina.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <button
+      mat-stroked-button
+      type="button"
+      [disabled]="previewLoading()"
+      (click)="buscar()"
+    >
+      @if (previewLoading()) {
+        <mat-spinner diameter="18"></mat-spinner>
+      } @else {
+        Buscar
+      }
+    </button>
+
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="18"></mat-spinner>
+      } @else {
+        Dar de alta
+      }
+    </button>
+  </form>
+
+  @if (previewError()) {
+    <p class="altas-preview-error">{{ previewError() }}</p>
+  }
+
+  @if (preview()) {
+    @if (preview()!.encontrado) {
+      <div class="altas-preview">
+        <p class="altas-preview-nombre">{{ preview()!.nombreCompleto || 'Sin nombre en CUSXACDI' }}</p>
+        <p class="altas-preview-detalle">
+          {{ preview()!.correo || 'Sin correo institucional' }}
+          · {{ preview()!.areaInstitucional || 'Sin área institucional' }}
+        </p>
+      </div>
+    } @else {
+      <p class="altas-preview-vacio">
+        No se encontró información institucional para ese número económico. Puedes dar de alta de todas formas.
+      </p>
+    }
+  }
+
+  @if (loading()) {
+    <div class="altas-loading">
+      <mat-spinner diameter="32"></mat-spinner>
+      <p>Cargando altas…</p>
+    </div>
+  } @else if (altas().length === 0) {
+    <p class="altas-vacio">Todavía no has dado de alta a nadie.</p>
+  } @else {
+    <table mat-table [dataSource]="altas()" class="altas-tabla">
+      <ng-container matColumnDef="numeroEconomico">
+        <th mat-header-cell *matHeaderCellDef>Número económico</th>
+        <td mat-cell *matCellDef="let alta">{{ alta.numeroEconomico }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="nombreCompleto">
+        <th mat-header-cell *matHeaderCellDef>Nombre completo</th>
+        <td mat-cell *matCellDef="let alta">{{ alta.nombreCompleto || 'Sin nombre en CUSXACDI' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="correoInstitucional">
+        <th mat-header-cell *matHeaderCellDef>Correo institucional</th>
+        <td mat-cell *matCellDef="let alta">{{ alta.correoInstitucional || 'Sin correo institucional' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="areaInstitucional">
+        <th mat-header-cell *matHeaderCellDef>Área institucional</th>
+        <td mat-cell *matCellDef="let alta">{{ alta.areaInstitucional || 'Sin área institucional' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="oficina">
+        <th mat-header-cell *matHeaderCellDef>Oficina</th>
+        <td mat-cell *matCellDef="let alta">
+          @if (alta.activatedAt) {
+            {{ alta.oficinaNombre || 'Sin oficina' }}
+          } @else {
+            <mat-select
+              class="oficina-select"
+              [value]="alta.oficinaId"
+              [disabled]="updatingOficinaId() === alta.numeroEconomico"
+              (selectionChange)="cambiarOficina(alta, $event.value)"
+            >
+              <mat-option [value]="null">Sin oficina</mat-option>
+              @for (oficina of oficinas(); track oficina.id) {
+                <mat-option [value]="oficina.id">{{ oficina.name }}</mat-option>
+              }
+            </mat-select>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="estado">
+        <th mat-header-cell *matHeaderCellDef>Estado</th>
+        <td mat-cell *matCellDef="let alta">
+          @if (alta.activatedAt) {
+            <span class="estado-chip estado-activo">Ya inició sesión</span>
+          } @else {
+            <span class="estado-chip estado-pendiente">Pendiente</span>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="createdByNombre">
+        <th mat-header-cell *matHeaderCellDef>Dado de alta por</th>
+        <td mat-cell *matCellDef="let alta">{{ alta.createdByNombre }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="createdAt">
+        <th mat-header-cell *matHeaderCellDef>Fecha</th>
+        <td mat-cell *matCellDef="let alta">{{ alta.createdAt | date: 'd MMM y' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="acciones">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let alta">
+          <button
+            mat-icon-button
+            type="button"
+            [disabled]="refreshingId() === alta.numeroEconomico"
+            (click)="refrescar(alta)"
+            aria-label="Actualizar información institucional"
+            matTooltip="Actualizar información institucional"
+          >
+            @if (refreshingId() === alta.numeroEconomico) {
+              <mat-spinner diameter="18"></mat-spinner>
+            } @else {
+              <mat-icon>refresh</mat-icon>
+            }
+          </button>
+
+          @if (!alta.activatedAt) {
+            <button
+              mat-icon-button
+              type="button"
+              [disabled]="deletingId() === alta.numeroEconomico"
+              (click)="eliminar(alta)"
+              aria-label="Quitar alta"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          }
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns"></tr>
+    </table>
+  }
+</div>

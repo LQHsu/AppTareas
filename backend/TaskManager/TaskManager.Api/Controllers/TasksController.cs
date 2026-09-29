@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.DTOs;
 using TaskManager.Api.Hubs;
+using TaskManager.Api.Notificaciones;
 using TaskManager.Domain.Entities;
 using TaskManager.Domain.Enums;
 using TaskManager.Infrastructure;
@@ -17,11 +18,13 @@ public class TasksController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IHubContext<TaskHub> _hub;
+    private readonly TaskNotificationService _notifications;
 
-    public TasksController(AppDbContext db, IHubContext<TaskHub> hub)
+    public TasksController(AppDbContext db, IHubContext<TaskHub> hub, TaskNotificationService notifications)
     {
         _db = db;
         _hub = hub;
+        _notifications = notifications;
     }
 
     // Transmite el estado actual de la tarea a quien deberia enterarse en
@@ -74,6 +77,7 @@ public class TasksController : ControllerBase
 
         var allTasks = await _db.Tasks
             .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .Include(t => t.StatusHistory)
@@ -89,9 +93,13 @@ public class TasksController : ControllerBase
             .GroupBy(t => t.ParentTaskId!.Value)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<TaskItem>)g.ToList());
 
+        // Incluye los ids de las subtareas: tambien salen en el DTO (como
+        // hijas de su tarea top-level) y necesitan sus propios conteos.
+        var conteos = await CargarConteos(allTasks.Select(t => t.Id).ToList());
+
         var topLevel = allTasks
             .Where(t => t.ParentTaskId is null)
-            .Select(t => ToDto(t, subtasksByParent.GetValueOrDefault(t.Id)))
+            .Select(t => ToDto(t, conteos, subtasksByParent.GetValueOrDefault(t.Id)))
             .ToList();
 
         return Ok(topLevel);
@@ -111,6 +119,7 @@ public class TasksController : ControllerBase
 
         var tasks = await _db.Tasks
             .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .Include(t => t.StatusHistory)
@@ -118,7 +127,9 @@ public class TasksController : ControllerBase
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
 
-        return Ok(tasks.Select(t => ToDto(t)).ToList());
+        var conteos = await CargarConteos(tasks.Select(t => t.Id).ToList());
+
+        return Ok(tasks.Select(t => ToDto(t, conteos)).ToList());
     }
 
     // POST /api/tasks
@@ -144,6 +155,7 @@ public class TasksController : ControllerBase
         {
             var parent = await _db.Tasks
                 .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
                 .FirstOrDefaultAsync(t => t.Id == dto.ParentTaskId.Value);
 
             if (parent is null) return BadRequest("Tarea padre invalida.");
@@ -167,7 +179,9 @@ public class TasksController : ControllerBase
         }
         else if (dto.ProjectId.HasValue)
         {
-            var project = await _db.Projects.FindAsync(dto.ProjectId.Value);
+            var project = await _db.Projects
+                .Include(p => p.Folder)
+                .FirstOrDefaultAsync(p => p.Id == dto.ProjectId.Value);
             if (project is null) return BadRequest("Proyecto invalido.");
 
             var isMember = await _db.ProjectMembers.AnyAsync(m => m.ProjectId == project.Id && m.UserId == userId);
@@ -175,6 +189,15 @@ public class TasksController : ControllerBase
             if (!isMember && !isOwner) return Forbid();
 
             areaId = project.AreaId;
+
+            // Si el proyecto vive en una carpeta compartida y no se
+            // eligio a nadie a mano, se asume que la tarea es para la
+            // persona con la que se comparte la carpeta (igual se puede
+            // cambiar despues, o elegir a otra persona desde el form).
+            if (assignedToId is null && project.Folder?.SharedWithId is not null)
+            {
+                assignedToId = project.Folder.SharedWithId;
+            }
         }
         else
         {
@@ -201,6 +224,7 @@ public class TasksController : ControllerBase
             AssignedToId = assignedToId,
             Status = assignedToId is not null ? TaskItemStatus.Asignada : TaskItemStatus.Creada,
             FechaAsignacion = assignedToId is not null ? DateTime.UtcNow : null,
+            FechaLimite = dto.FechaLimite,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
@@ -221,13 +245,22 @@ public class TasksController : ControllerBase
 
         var full = await _db.Tasks
             .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .Include(t => t.StatusHistory)
             .FirstAsync(t => t.Id == task.Id);
 
-        var resultDto = ToDto(full);
+        // Recien creada: no puede tener comentarios ni adjuntos todavia.
+        var resultDto = ToDto(full, ConteosTarea.Vacio);
         await NotificarCambio(full, resultDto);
+
+        // Nace ya asignada (se elegio a alguien en el form de creacion) -
+        // avisar por correo/Chat, best-effort (ver TaskNotificationService).
+        if (full.AssignedTo is not null)
+        {
+            await _notifications.NotifyTaskAssignedAsync(full, full.AssignedTo);
+        }
 
         return CreatedAtAction(nameof(GetByProject), new { projectId }, resultDto);
     }
@@ -246,6 +279,7 @@ public class TasksController : ControllerBase
         // necesidad de volver a consultar despues de SaveChanges.
         var task = await _db.Tasks
             .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .Include(t => t.StatusHistory)
@@ -276,10 +310,14 @@ public class TasksController : ControllerBase
         // - Creada/Asignada/Leida son automaticas (se ponen solas al
         //   crear, asignar, o abrir el modal — ver Create/UpdateAssignee
         //   /MarkRead). Solo el creador las puede forzar a mano.
-        // - En atencion/Atendida: el avance del trabajo en si, lo marca
-        //   quien la tiene asignada (o el creador).
-        // - Volver a revisar/Terminada/Cancelada: evaluar y cerrar el
-        //   trabajo es decision de quien creo la tarea.
+        // - En atencion/Atendida/Volver a revisar: el ida-y-vuelta del
+        //   avance del trabajo, lo marca quien la tiene asignada (o el
+        //   creador) - el creador la manda a "Volver a revisar" cuando
+        //   no quedo bien, y el asignado necesita poder mandarla de
+        //   vuelta el mismo camino despues de corregirla (no solo saltar
+        //   a Atendida), sin que el creador tenga que intervenir.
+        // - Terminada/Cancelada: cerrar el trabajo es decision de quien
+        //   creo la tarea.
         var esCreador = task.CreatedById == userId
             || (task.ProjectId.HasValue && task.Project!.OwnerId == userId);
         var esAsignado = task.AssignedToId == userId;
@@ -287,8 +325,8 @@ public class TasksController : ControllerBase
         var permitido = dto.Status switch
         {
             TaskItemStatus.Creada or TaskItemStatus.Asignada or TaskItemStatus.Leida => esCreador,
-            TaskItemStatus.EnAtencion or TaskItemStatus.Atendida => esCreador || esAsignado,
-            TaskItemStatus.VolverARevisar or TaskItemStatus.Terminada or TaskItemStatus.Cancelada => esCreador,
+            TaskItemStatus.EnAtencion or TaskItemStatus.Atendida or TaskItemStatus.VolverARevisar => esCreador || esAsignado,
+            TaskItemStatus.Terminada or TaskItemStatus.Cancelada => esCreador,
             _ => false,
         };
 
@@ -306,10 +344,57 @@ public class TasksController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        var resultDto = ToDto(task);
+        var resultDto = ToDto(task, await CargarConteos([task.Id]));
         await NotificarCambio(task, resultDto);
 
         return Ok(resultDto);
+    }
+
+    // GET /api/tasks/{id}/status-history
+    // Linea de tiempo completa de cambios de estado (quien y cuando),
+    // mas reciente primero. Independiente de quien tenga la tarea
+    // asignada ahora mismo: ChangedById es un dato fijo del momento en
+    // que ocurrio cada cambio, reasignar la tarea despues no lo toca
+    // (ver comentario en TaskStatusHistory.cs).
+    [HttpGet("{id:guid}/status-history")]
+    public async Task<ActionResult<IEnumerable<TaskStatusHistoryDto>>> GetStatusHistory(Guid id)
+    {
+        var userId = GetUserIdFromToken();
+
+        var task = await _db.Tasks
+            .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        if (task is null) return NotFound();
+
+        // Misma regla de visibilidad que UpdateStatus/GetByProject.
+        if (task.ProjectId.HasValue)
+        {
+            var isMember = await _db.ProjectMembers.AnyAsync(m => m.ProjectId == task.ProjectId && m.UserId == userId);
+            var isOwner = task.Project!.OwnerId == userId;
+            if (!isMember && !isOwner) return Forbid();
+        }
+        else if (task.AssignedToId != userId && task.CreatedById != userId)
+        {
+            return Forbid();
+        }
+
+        var historial = await _db.TaskStatusHistories
+            .Include(h => h.ChangedBy)
+            .Where(h => h.TaskId == id)
+            .OrderByDescending(h => h.ChangedAt)
+            .Select(h => new TaskStatusHistoryDto(
+                h.Id,
+                h.OldStatus,
+                h.NewStatus,
+                h.ChangedById,
+                h.ChangedBy.FullName,
+                h.ChangedAt
+            ))
+            .ToListAsync();
+
+        return Ok(historial);
     }
 
     // Centraliza "mover el estado + registrar el historial": lo usan
@@ -346,6 +431,7 @@ public class TasksController : ControllerBase
 
         var task = await _db.Tasks
             .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .Include(t => t.StatusHistory)
@@ -354,7 +440,10 @@ public class TasksController : ControllerBase
         if (task is null) return NotFound();
         if (task.AssignedToId != userId) return Forbid();
 
-        var resultDto = ToDto(task);
+        // Una sola vez para las dos llamadas a ToDto: marcar como leida no
+        // toca comentarios ni adjuntos.
+        var conteos = await CargarConteos([task.Id]);
+        var resultDto = ToDto(task, conteos);
 
         if (task.Status == TaskItemStatus.Asignada)
         {
@@ -362,7 +451,7 @@ public class TasksController : ControllerBase
             CambiarEstado(task, userId, TaskItemStatus.Leida);
             await _db.SaveChangesAsync();
 
-            resultDto = ToDto(task);
+            resultDto = ToDto(task, conteos);
             await NotificarCambio(task, resultDto);
         }
 
@@ -372,7 +461,8 @@ public class TasksController : ControllerBase
     // PATCH /api/tasks/{id}/assign
     // Asigna (o quita la asignacion, si AssignedToId viene null) una
     // tarea ya creada. El nuevo asignado debe pertenecer a la misma
-    // area de la tarea, igual que en Create.
+    // area de la tarea, igual que en Create. Solo quien creo la tarea
+    // puede llamar este endpoint (ver chequeo de abajo).
     [HttpPatch("{id:guid}/assign")]
     public async Task<ActionResult<TaskItemDto>> UpdateAssignee(Guid id, UpdateTaskAssigneeDto dto)
     {
@@ -381,24 +471,18 @@ public class TasksController : ControllerBase
 
         var task = await _db.Tasks
             .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (task is null) return NotFound();
 
-        // Mismo criterio de autorizacion que UpdateStatus: cualquier
-        // miembro/dueno del proyecto, o el creador/asignado si es suelta.
-        if (task.ProjectId.HasValue)
-        {
-            var isMember = await _db.ProjectMembers.AnyAsync(m => m.ProjectId == task.ProjectId && m.UserId == userId);
-            var isOwner = task.Project!.OwnerId == userId;
-            if (!isMember && !isOwner) return Forbid();
-        }
-        else if (task.AssignedToId != userId && task.CreatedById != userId)
-        {
-            return Forbid();
-        }
+        // A diferencia de UpdateStatus/UpdateDetails, asignar (o
+        // reasignar) una tarea es exclusivo de quien la creo: ni el
+        // dueno del proyecto, ni la persona asignada actualmente, pueden
+        // cambiarla por otra.
+        if (task.CreatedById != userId) return Forbid();
 
         if (assignedToId is not null)
         {
@@ -441,14 +525,23 @@ public class TasksController : ControllerBase
 
         var full = await _db.Tasks
             .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .Include(t => t.StatusHistory)
             .FirstAsync(t => t.Id == task.Id);
 
-        var resultDto = ToDto(full);
+        var resultDto = ToDto(full, await CargarConteos([full.Id]));
         var avisarAsignadoAnterior = assigneeCambio && asignadoAnterior is not null ? asignadoAnterior : null;
         await NotificarCambio(full, resultDto, avisarAsignadoAnterior);
+
+        // Solo si de verdad cambio el asignado (no en un "reasignar" a la
+        // misma persona) y quedo alguien asignado (no en un "quitar
+        // asignacion").
+        if (assigneeCambio && full.AssignedTo is not null)
+        {
+            await _notifications.NotifyTaskAssignedAsync(full, full.AssignedTo);
+        }
 
         return Ok(resultDto);
     }
@@ -464,6 +557,7 @@ public class TasksController : ControllerBase
 
         var task = await _db.Tasks
             .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .Include(t => t.StatusHistory)
@@ -487,26 +581,69 @@ public class TasksController : ControllerBase
 
         task.Title = title;
         task.Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description;
+        task.FechaLimite = dto.FechaLimite;
         task.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
 
         // Igual que UpdateStatus/UpdateAssignee: el DTO sale sin
         // subtareas y el frontend conserva las que ya tenia cargadas.
-        var resultDto = ToDto(task);
+        var resultDto = ToDto(task, await CargarConteos([task.Id]));
         await NotificarCambio(task, resultDto);
 
         return Ok(resultDto);
+    }
+
+    // Cuantos comentarios/adjuntos tiene cada tarea, para los iconos de
+    // la tabla. Dos GROUP BY en vez de Include(t => t.Comments/
+    // .Attachments): con Include, cada renglon de la lista arrastraria el
+    // texto completo de sus comentarios (hasta 4000 caracteres cada uno)
+    // y los metadatos de sus archivos, cuando lo unico que se necesita es
+    // saber si hay o no. Son 2 queries fijas, no una por tarea.
+    private sealed record ConteosTarea(
+        Dictionary<Guid, int> Comentarios,
+        Dictionary<Guid, int> Adjuntos)
+    {
+        public static readonly ConteosTarea Vacio = new([], []);
+
+        public int ComentariosDe(Guid taskId) => Comentarios.GetValueOrDefault(taskId);
+        public int AdjuntosDe(Guid taskId) => Adjuntos.GetValueOrDefault(taskId);
+    }
+
+    private async Task<ConteosTarea> CargarConteos(IReadOnlyCollection<Guid> taskIds)
+    {
+        if (taskIds.Count == 0) return ConteosTarea.Vacio;
+
+        var comentarios = await _db.TaskComments
+            .Where(c => taskIds.Contains(c.TaskId))
+            .GroupBy(c => c.TaskId)
+            .Select(g => new { TaskId = g.Key, Total = g.Count() })
+            .ToDictionaryAsync(x => x.TaskId, x => x.Total);
+
+        var adjuntos = await _db.TaskAttachments
+            .Where(a => taskIds.Contains(a.TaskId))
+            .GroupBy(a => a.TaskId)
+            .Select(g => new { TaskId = g.Key, Total = g.Count() })
+            .ToDictionaryAsync(x => x.TaskId, x => x.Total);
+
+        return new ConteosTarea(comentarios, adjuntos);
     }
 
     // subtasks: solo se pasa al mapear una tarea top-level (ver
     // GetByProject). Al mapear cada subtarea se llama sin este
     // parametro, con lo que su propio Subtasks queda vacio y se respeta
     // el limite de un solo nivel de anidamiento.
-    private static TaskItemDto ToDto(TaskItem t, IReadOnlyList<TaskItem>? subtasks = null) => new(
+    private static TaskItemDto ToDto(
+        TaskItem t,
+        ConteosTarea conteos,
+        IReadOnlyList<TaskItem>? subtasks = null) => new(
         t.Id,
         t.ProjectId,
         t.Project?.Name,
+        t.Project?.Color,
+        t.Project?.Folder?.Id,
+        t.Project?.Folder?.Name,
+        t.Project?.Folder?.Color,
         t.ParentTaskId,
         t.Title,
         t.Description,
@@ -519,9 +656,12 @@ public class TasksController : ControllerBase
         t.FechaAsignacion,
         t.FechaAtencion,
         t.FechaTerminacion,
+        t.FechaLimite,
         t.CreatedAt,
         t.StatusHistory.Count > 0 ? t.StatusHistory.Max(h => h.ChangedAt) : t.CreatedAt,
-        (subtasks ?? Array.Empty<TaskItem>()).Select(s => ToDto(s)).ToList()
+        conteos.ComentariosDe(t.Id),
+        conteos.AdjuntosDe(t.Id),
+        (subtasks ?? Array.Empty<TaskItem>()).Select(s => ToDto(s, conteos)).ToList()
     );
 
     private string GetUserIdFromToken()

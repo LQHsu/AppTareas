@@ -12,7 +12,10 @@ public record UserDto(
     int AreaId,
     string AreaNombre,
     bool IsSuperAdmin,
-    bool IsBanned
+    bool IsBanned,
+    bool IsCoordinador,
+    bool NotifyByEmail,
+    bool NotifyByChat
 );
 
 public record CreateUserDto(
@@ -21,4 +24,9 @@ public record CreateUserDto(
     string Email,
     string FullName,
     int AreaId
+);
+
+public record UpdateNotificationPreferencesDto(
+    bool NotifyByEmail,
+    bool NotifyByChat
 );

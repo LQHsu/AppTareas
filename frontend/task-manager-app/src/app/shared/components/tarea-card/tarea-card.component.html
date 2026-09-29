@@ -30,6 +30,9 @@
     <div class="tarea__meta">
       @if (showProject) {
         <span class="meta-item">
+          @if (task.projectColor) {
+            <span class="meta-item__dot" [style.background-color]="task.projectColor"></span>
+          }
           <mat-icon inline>folder_open</mat-icon>
           {{ task.projectName ?? 'Sin proyecto (tarea suelta)' }}
         </span>
@@ -42,6 +45,17 @@
         <mat-icon inline>schedule</mat-icon>
         {{ task.createdAt | date: "d 'de' MMMM y, HH:mm" }}
       </span>
+      @if (task.fechaLimite) {
+        <span class="meta-item">
+          <mat-icon inline>event</mat-icon>
+          <!-- timeZone 'UTC': fechaLimite es solo una fecha de
+               calendario (sin hora), guardada como medianoche UTC -
+               sin esto, en Mexico (UTC-6) el pipe la mostraria un dia
+               antes del que se eligio. Ver mismo comentario en
+               TareasTablaComponent.formatFechaLimite. -->
+          Fecha límite: {{ task.fechaLimite | date: "d 'de' MMMM y" : 'UTC' }}
+        </span>
+      }
     </div>
   </header>
 
@@ -54,6 +68,12 @@
         [(ngModel)]="edicionDescripcion"
         placeholder="Describe en qué consiste la tarea…"
       />
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo-fecha-limite">
+        <mat-label>Fecha límite (opcional)</mat-label>
+        <input matInput [matDatepicker]="edicionFechaLimitePicker" [(ngModel)]="edicionFechaLimite" />
+        <mat-datepicker-toggle matIconSuffix [for]="edicionFechaLimitePicker"></mat-datepicker-toggle>
+        <mat-datepicker #edicionFechaLimitePicker></mat-datepicker>
+      </mat-form-field>
       <div class="edicion__acciones">
         <button mat-button type="button" (click)="cancelarEdicion()">Cancelar</button>
         <button
@@ -78,7 +98,7 @@
   <section class="bloque">
     <h4 class="bloque__titulo">Asignación y estado</h4>
     <div class="campos">
-      @if (members) {
+      @if (members && puedeAsignar) {
         <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo">
           <mat-label>Persona asignada</mat-label>
           <mat-select
@@ -181,7 +201,8 @@
                 subtaskDetailsChange.emit({
                   subtask: sub,
                   title: $event.title,
-                  description: $event.description
+                  description: $event.description,
+                  fechaLimite: $event.fechaLimite
                 })
               "
             />
@@ -382,6 +403,58 @@
               </button>
             </div>
           </div>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- HISTORIAL DE ESTADOS -->
+  <section class="bloque">
+    <button
+      type="button"
+      class="bloque__toggle"
+      [attr.aria-expanded]="showHistorial()"
+      (click)="toggleHistorial()"
+    >
+      <mat-icon class="bloque__toggle-icono">history</mat-icon>
+      <span class="bloque__titulo bloque__titulo--inline">Historial de estados</span>
+      @if (historial().length > 0) {
+        <span class="contador">{{ historial().length }}</span>
+      }
+      <mat-icon class="bloque__chevron">
+        {{ showHistorial() ? 'expand_less' : 'expand_more' }}
+      </mat-icon>
+    </button>
+
+    @if (showHistorial()) {
+      <div class="bloque__cuerpo">
+        @if (historialError()) {
+          <p class="mensaje mensaje--error">{{ historialError() }}</p>
+        }
+
+        @if (loadingHistorial()) {
+          <p class="vacio">Cargando historial…</p>
+        } @else if (historial().length > 0) {
+          <ul class="lista-historial">
+            @for (h of historial(); track h.id) {
+              <li class="historial-item">
+                <mat-icon class="historial-item__icono" inline>arrow_forward</mat-icon>
+                <div class="historial-item__texto">
+                  <span>
+                    <strong>{{ h.changedByFullName }}</strong>
+                    cambió
+                    @if (h.oldStatus !== null) {
+                      de <strong>{{ statusLabels[h.oldStatus] }}</strong>
+                    }
+                    a <strong>{{ statusLabels[h.newStatus] }}</strong>
+                  </span>
+                  <span class="historial-item__fecha">{{ h.changedAt | date: 'd MMM y, HH:mm' }}</span>
+                </div>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="vacio">Todavía no hay historial de estados.</p>
         }
       </div>
     }

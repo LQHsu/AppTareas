@@ -1,0 +1,23 @@
+<h2 mat-dialog-title>Marcar «{{ data.taskTitle }}» como atendida</h2>
+
+<mat-dialog-content class="atendida__body">
+  <p class="atendida__lede">
+    Cuéntale a quien te asignó esta tarea las acciones que hiciste para dar atención, ayuda a completar la información y a que no se tenga que preguntar después.
+  </p>
+
+  <mat-form-field appearance="outline" class="atendida__campo">
+    <mat-label>Comentario</mat-label>
+    <textarea
+      matInput
+      rows="4"
+      [ngModel]="comentario()"
+      (ngModelChange)="comentario.set($event)"
+      placeholder="Ej. Ya actualicé el reporte con los datos de marzo…"
+    ></textarea>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Cancelar</button>
+  <button mat-flat-button [disabled]="!comentario().trim()" (click)="confirmar()">Marcar como atendida</button>
+</mat-dialog-actions>

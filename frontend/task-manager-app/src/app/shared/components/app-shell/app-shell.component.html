@@ -1,4 +1,7 @@
-<mat-sidenav-container class="shell-container">
+<div class="shell-root">
+  <app-topbar></app-topbar>
+
+  <mat-sidenav-container class="shell-container">
   <mat-sidenav #sidenavEl mode="side" opened class="shell-nav" [class.shell-nav--expanded]="expanded()">
     <div class="shell-toggle">
       <button
@@ -15,13 +18,13 @@
         routerLink="/carpetas"
         routerLinkActive="shell-link--active"
         class="shell-link"
-        matTooltip="Carpetas"
+        matTooltip="Oficinas"
         [matTooltipDisabled]="expanded()"
         matTooltipPosition="right"
       >
         <mat-icon>folder</mat-icon>
         @if (expanded()) {
-          <span>Carpetas</span>
+          <span>Oficinas</span>
         }
       </a>
 
@@ -65,6 +68,22 @@
           <mat-icon>admin_panel_settings</mat-icon>
           @if (expanded()) {
             <span>Admin</span>
+          }
+        </a>
+      }
+
+      @if (userService.currentUser()?.isCoordinador || userService.currentUser()?.isSuperAdmin) {
+        <a
+          routerLink="/altas"
+          routerLinkActive="shell-link--active"
+          class="shell-link"
+          matTooltip="Dar de alta"
+          [matTooltipDisabled]="expanded()"
+          matTooltipPosition="right"
+        >
+          <mat-icon>person_add</mat-icon>
+          @if (expanded()) {
+            <span>Dar de alta</span>
           }
         </a>
       }
@@ -129,4 +148,5 @@
   <mat-sidenav-content class="shell-content">
     <router-outlet></router-outlet>
   </mat-sidenav-content>
-</mat-sidenav-container>
+  </mat-sidenav-container>
+</div>

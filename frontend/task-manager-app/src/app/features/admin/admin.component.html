@@ -40,10 +40,25 @@
             <ng-container matColumnDef="superAdmin">
               <th mat-header-cell *matHeaderCellDef>Super admin</th>
               <td mat-cell *matCellDef="let user">
+                @if (isSelf(user)) {
+                  <span class="not-applicable" title="No puedes quitarte el rol a ti mismo">—</span>
+                } @else {
+                  <mat-slide-toggle
+                    [checked]="user.isSuperAdmin"
+                    [disabled]="updatingUserId() === user.id"
+                    (change)="onToggleSuperAdmin(user, $event)"
+                  ></mat-slide-toggle>
+                }
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="coordinador">
+              <th mat-header-cell *matHeaderCellDef>Coordinador</th>
+              <td mat-cell *matCellDef="let user">
                 <mat-slide-toggle
-                  [checked]="user.isSuperAdmin"
+                  [checked]="user.isCoordinador"
                   [disabled]="updatingUserId() === user.id"
-                  (change)="onToggleSuperAdmin(user, $event)"
+                  (change)="onToggleCoordinador(user, $event)"
                 ></mat-slide-toggle>
               </td>
             </ng-container>

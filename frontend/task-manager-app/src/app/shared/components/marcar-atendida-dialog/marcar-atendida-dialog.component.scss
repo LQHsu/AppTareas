@@ -1,0 +1,26 @@
+@use '@angular/material' as mat;
+
+// Mismo ajuste que compartir-carpeta-dialog: sin esto el mat-form-field
+// mide ~56px de alto por default y se ve enorme al lado del texto.
+:host {
+  @include mat.form-field-density(-3);
+}
+
+.atendida__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 320px;
+  max-width: 480px;
+  padding-top: 4px;
+}
+
+.atendida__lede {
+  margin: 0;
+  font-size: 13px;
+  color: var(--app-text-muted);
+}
+
+.atendida__campo {
+  width: 100%;
+}

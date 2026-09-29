@@ -49,7 +49,11 @@ public class ProjectsController : ControllerBase
                 p.Tasks.Count(t => t.Status != TaskItemStatus.Cancelada),
                 p.Tasks.Count(t => t.Status == TaskItemStatus.Terminada),
                 p.FolderId,
-                p.Folder != null ? p.Folder.Name : null
+                p.Folder != null ? p.Folder.Name : null,
+                p.Folder != null ? p.Folder.SharedWithId : null,
+                p.Folder != null && p.Folder.SharedWith != null ? p.Folder.SharedWith.FullName : null,
+                p.Color,
+                p.Folder != null ? p.Folder.Color : null
             ))
             .ToListAsync();
 
@@ -70,7 +74,7 @@ public class ProjectsController : ControllerBase
             .Include(p => p.Owner)
             .Include(p => p.Members)
             .Include(p => p.Tasks)
-            .Include(p => p.Folder)
+            .Include(p => p.Folder).ThenInclude(f => f!.SharedWith)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (project is null) return NotFound();
@@ -94,7 +98,7 @@ public class ProjectsController : ControllerBase
             .Include(p => p.Area)
             .Include(p => p.Owner)
             .Include(p => p.Tasks)
-            .Include(p => p.Folder)
+            .Include(p => p.Folder).ThenInclude(f => f!.SharedWith)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (project is null) return NotFound();
@@ -102,9 +106,11 @@ public class ProjectsController : ControllerBase
 
         var name = dto.Name?.Trim() ?? string.Empty;
         if (name.Length == 0) return BadRequest("El nombre del proyecto no puede estar vacio.");
+        if (!ColorValidation.IsValidHex(dto.Color)) return BadRequest("El color no es un codigo hexadecimal valido.");
 
         project.Name = name;
         project.Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description;
+        project.Color = dto.Color;
 
         await _db.SaveChangesAsync();
 
@@ -126,7 +132,7 @@ public class ProjectsController : ControllerBase
             .Include(p => p.Area)
             .Include(p => p.Owner)
             .Include(p => p.Tasks)
-            .Include(p => p.Folder)
+            .Include(p => p.Folder).ThenInclude(f => f!.SharedWith)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (project is null) return NotFound();
@@ -134,7 +140,7 @@ public class ProjectsController : ControllerBase
 
         if (dto.FolderId.HasValue)
         {
-            var folder = await _db.ProjectFolders.FirstOrDefaultAsync(f => f.Id == dto.FolderId.Value);
+            var folder = await _db.ProjectFolders.Include(f => f.SharedWith).FirstOrDefaultAsync(f => f.Id == dto.FolderId.Value);
             if (folder is null) return BadRequest("Carpeta invalida.");
             if (folder.OwnerId != userId) return Forbid();
 
@@ -158,7 +164,9 @@ public class ProjectsController : ControllerBase
         p.IsArchived, p.CreatedAt,
         p.Tasks.Count(t => t.Status != TaskItemStatus.Cancelada),
         p.Tasks.Count(t => t.Status == TaskItemStatus.Terminada),
-        p.FolderId, p.Folder?.Name
+        p.FolderId, p.Folder?.Name,
+        p.Folder?.SharedWithId, p.Folder?.SharedWith?.FullName,
+        p.Color, p.Folder?.Color
     );
 
     // GET /api/projects/{id}/attachments
@@ -211,16 +219,18 @@ public class ProjectsController : ControllerBase
 
         var user = await _db.Users.FindAsync(userId);
         if (user is null) return BadRequest("Tu usuario no esta registrado todavia.");
+        if (!ColorValidation.IsValidHex(dto.Color)) return BadRequest("El color no es un codigo hexadecimal valido.");
 
         // Igual que en MoveToFolder: solo se puede meter a una carpeta
-        // propia. Si la carpeta ya esta compartida, el proyecto nuevo
-        // nace sin dueño-tarea-asignada especial: sus tareas se crean
-        // como siempre y solo se reasignan la proxima vez que la
-        // carpeta se comparta de nuevo (compartir no se dispara aqui).
+        // propia. Si la carpeta ya esta compartida, la persona con la
+        // que se comparte se agrega de una vez como miembro del proyecto
+        // nuevo (ver bloque de abajo) — es la misma logica que aplica
+        // FoldersController.Share sobre los proyectos que ya existian en
+        // la carpeta al momento de compartirla.
         ProjectFolder? folder = null;
         if (dto.FolderId.HasValue)
         {
-            folder = await _db.ProjectFolders.FirstOrDefaultAsync(f => f.Id == dto.FolderId.Value);
+            folder = await _db.ProjectFolders.Include(f => f.SharedWith).FirstOrDefaultAsync(f => f.Id == dto.FolderId.Value);
             if (folder is null) return BadRequest("Carpeta invalida.");
             if (folder.OwnerId != userId) return Forbid();
         }
@@ -230,6 +240,7 @@ public class ProjectsController : ControllerBase
             Id = Guid.NewGuid(),
             Name = dto.Name,
             Description = dto.Description,
+            Color = dto.Color,
             AreaId = user.AreaId,
             OwnerId = user.Id,
             IsArchived = false,
@@ -246,6 +257,16 @@ public class ProjectsController : ControllerBase
             JoinedAt = DateTime.UtcNow,
         });
 
+        if (folder?.SharedWithId is not null && folder.SharedWithId != user.Id)
+        {
+            _db.ProjectMembers.Add(new ProjectMember
+            {
+                ProjectId = project.Id,
+                UserId = folder.SharedWithId,
+                JoinedAt = DateTime.UtcNow,
+            });
+        }
+
         await _db.SaveChangesAsync();
 
         var area = await _db.Areas.FindAsync(user.AreaId);
@@ -254,7 +275,9 @@ public class ProjectsController : ControllerBase
             project.Id, project.Name, project.Description,
             project.AreaId, area!.Nombre, project.OwnerId, user.FullName,
             project.IsArchived, project.CreatedAt, 0, 0,
-            folder?.Id, folder?.Name
+            folder?.Id, folder?.Name,
+            folder?.SharedWithId, folder?.SharedWith?.FullName,
+            project.Color, folder?.Color
         ));
     }
 

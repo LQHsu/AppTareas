@@ -1,0 +1,30 @@
+<header class="topbar">
+  <img src="img/LogoUAMEncabezado.png" alt="Universidad Autónoma Metropolitana - Unidad Xochimilco" class="topbar__logo" />
+
+  @if (userService.currentUser(); as user) {
+    <button
+      mat-button
+      class="topbar__usuario"
+      [matMenuTriggerFor]="menu"
+      aria-label="Menú de usuario"
+    >
+      <span class="topbar__datos">
+        <span class="topbar__nombre">{{ user.fullName }}</span>
+        <span class="topbar__rol">{{ rolLabel(user) }}</span>
+      </span>
+      <mat-icon class="topbar__chevron">expand_more</mat-icon>
+    </button>
+
+    <mat-menu #menu="matMenu">
+      <div class="topbar__menu-header">{{ user.email }}</div>
+      <button mat-menu-item (click)="abrirNotificaciones(user)">
+        <mat-icon>notifications</mat-icon>
+        <span>Notificaciones</span>
+      </button>
+      <button mat-menu-item (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        <span>Cerrar sesión</span>
+      </button>
+    </mat-menu>
+  }
+</header>

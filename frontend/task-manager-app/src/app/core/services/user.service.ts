@@ -12,6 +12,14 @@ export interface UserDto {
   areaNombre: string;
   isSuperAdmin: boolean;
   isBanned: boolean;
+  isCoordinador: boolean;
+  notifyByEmail: boolean;
+  notifyByChat: boolean;
+}
+
+export interface UpdateNotificationPreferencesDto {
+  notifyByEmail: boolean;
+  notifyByChat: boolean;
 }
 
 export interface CreateUserDto {
@@ -52,5 +60,14 @@ export class UserService {
   // gente a un proyecto o asignar tareas sueltas.
   getByArea(areaId: number): Observable<UserDto[]> {
     return this.http.get<UserDto[]>(`${this.baseUrl}?areaId=${areaId}`);
+  }
+
+  // Actualiza currentUser con la respuesta para que el resto de la app
+  // (ej. si se vuelve a abrir el dialogo) vea el valor recien guardado
+  // sin tener que llamar getMe() de nuevo.
+  updateNotificationPreferences(dto: UpdateNotificationPreferencesDto): Observable<UserDto> {
+    return this.http.patch<UserDto>(`${this.baseUrl}/me/notifications`, dto).pipe(
+      tap((user) => this.currentUser.set(user))
+    );
   }
 }

@@ -9,6 +9,10 @@ public class ProjectFolder
 
     public string Name { get; set; } = string.Empty;
 
+    // Color elegido por el dueno para distinguirla visualmente (hex, ej.
+    // "#3B82F6"). Puramente cosmetico, ninguna logica depende de esto.
+    public string? Color { get; set; }
+
     // Dueno de la carpeta. Solo el puede renombrarla, borrarla, meter o
     // sacar proyectos y compartirla.
     public string OwnerId { get; set; } = string.Empty;

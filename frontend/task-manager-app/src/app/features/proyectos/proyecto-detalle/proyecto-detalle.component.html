@@ -24,6 +24,8 @@
             placeholder="Describe de qué trata el proyecto…"
           />
 
+          <app-color-picker [(ngModel)]="edicionColor" label="Color (opcional)" />
+
           <div class="create-actions">
             <button mat-button type="button" (click)="cancelarEdicionProyecto()">Cancelar</button>
             <button
@@ -44,20 +46,43 @@
     } @else {
       <header class="detalle-header">
         <div>
-          <h1>{{ p.name }}</h1>
-          <p class="detalle-subtitle">{{ p.areaNombre }} · Dueño: {{ p.ownerFullName }}</p>
+          <h1>
+            @if (p.color) {
+              <span class="detalle-color" [style.background-color]="p.color"></span>
+            }
+            {{ p.name }}
+          </h1>
+          <p class="detalle-subtitle">{{ p.areaNombre }} · Propietario: {{ p.ownerFullName }}</p>
         </div>
-        @if (isOwner()) {
-          <button
-            mat-stroked-button
-            type="button"
-            (click)="entrarEdicionProyecto()"
-            aria-label="Editar nombre y descripción del proyecto"
-          >
-            <mat-icon>edit</mat-icon>
-            Editar
-          </button>
-        }
+
+        <div class="detalle-header-actions">
+          @if (otrosProyectos().length > 1) {
+            <mat-form-field
+              appearance="outline"
+              subscriptSizing="dynamic"
+              class="selector-proyecto"
+            >
+              <mat-label>Cambiar de proyecto</mat-label>
+              <mat-select [value]="projectId" (selectionChange)="cambiarDeProyecto($event.value)">
+                @for (proyecto of otrosProyectos(); track proyecto.id) {
+                  <mat-option [value]="proyecto.id">{{ proyecto.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+
+          @if (isOwner()) {
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="entrarEdicionProyecto()"
+              aria-label="Editar nombre y descripción del proyecto"
+            >
+              <mat-icon>edit</mat-icon>
+              Editar
+            </button>
+          }
+        </div>
       </header>
 
       <!-- innerHTML: la descripcion se escribe con app-editor-texto y se
@@ -109,6 +134,13 @@
                   }
                 </mat-select>
                 <mat-hint>Si eliges más de una persona, se crea una tarea igual para cada una.</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="create-field">
+                <mat-label>Fecha límite (opcional)</mat-label>
+                <input matInput [matDatepicker]="fechaLimitePicker" formControlName="fechaLimite" />
+                <mat-datepicker-toggle matIconSuffix [for]="fechaLimitePicker"></mat-datepicker-toggle>
+                <mat-datepicker #fechaLimitePicker></mat-datepicker>
               </mat-form-field>
 
               <div class="create-actions">

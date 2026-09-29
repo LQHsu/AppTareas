@@ -25,9 +25,14 @@ html {
   // CON informacion se quedan en blanco (--app-surface), pero cualquier
   // fondo "vacio" (el shell, contenedores sin contenido propio, chips)
   // usa este tono. Verde/rojo tambien se actualizaron (ver mas abajo).
-  --app-blue: #2e5966;
-  --app-blue-strong: #274c57;
-  --app-blue-soft: #f2f6ff;
+  //
+  // v3 (2026-09-23): azul de marca cambiado a #4169E1. El teal anterior
+  // queda en --app-blue-legacy (sin usarse en ningun lado) por si hace
+  // falta retomarlo mas adelante.
+  --app-blue-legacy: #2e5966;
+  --app-blue: #4169e1;
+  --app-blue-strong: #3759bf;
+  --app-blue-soft: #f0f3fd;
 
   // Fondo de "recuadros sin informacion" (el shell, el body detras de
   // las tarjetas): las tarjetas/modales que SI muestran informacion se

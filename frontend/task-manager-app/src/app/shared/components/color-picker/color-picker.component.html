@@ -1,0 +1,71 @@
+@if (label) {
+  <label class="color-picker__label">{{ label }}</label>
+}
+
+<div class="color-picker" role="group" [attr.aria-label]="label || 'Elegir color'">
+  @if (allowNone) {
+    <button
+      type="button"
+      class="swatch swatch--ninguno"
+      [class.swatch--selected]="value() === null"
+      [attr.aria-pressed]="value() === null"
+      [disabled]="disabled()"
+      matTooltip="Sin color"
+      aria-label="Sin color"
+      (click)="seleccionar(null)"
+    >
+      @if (value() === null) {
+        <mat-icon inline>check</mat-icon>
+      }
+    </button>
+  }
+
+  @for (color of palette; track color.hex) {
+    <button
+      type="button"
+      class="swatch"
+      [class.swatch--selected]="value() === color.hex"
+      [style.background-color]="color.hex"
+      [attr.aria-pressed]="value() === color.hex"
+      [attr.aria-label]="color.name"
+      [matTooltip]="color.name"
+      [disabled]="disabled()"
+      (click)="seleccionar(color.hex)"
+    >
+      @if (value() === color.hex) {
+        <mat-icon inline>check</mat-icon>
+      }
+    </button>
+  }
+
+  <!-- Personalizado: dispara el input[type=color] nativo escondido al
+       hacer click en el swatch. El swatch se pinta con el ultimo color
+       personalizado elegido (o gris neutro si nunca se uso). -->
+  <button
+    type="button"
+    class="swatch swatch--personalizado"
+    [class.swatch--selected]="!enPaleta"
+    [style.background-color]="customColor() ?? undefined"
+    [attr.aria-pressed]="!enPaleta"
+    matTooltip="Color personalizado"
+    aria-label="Color personalizado"
+    [disabled]="disabled()"
+    (click)="colorInput.click()"
+  >
+    @if (!enPaleta) {
+      <mat-icon inline>check</mat-icon>
+    } @else {
+      <mat-icon inline>palette</mat-icon>
+    }
+  </button>
+  <input
+    #colorInput
+    type="color"
+    class="color-picker__input-nativo"
+    [value]="customColor() ?? '#3B82F6'"
+    [disabled]="disabled()"
+    (input)="onCustomColorInput($event)"
+    aria-hidden="true"
+    tabindex="-1"
+  />
+</div>

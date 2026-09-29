@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { superAdminGuard } from './core/guards/super-admin.guard';
+import { coordinadorGuard } from './core/guards/coordinador.guard';
 
 // Todas las pantallas se cargan con loadComponent (lazy). Antes se
 // importaban de forma estatica y todo terminaba en el bundle inicial:
@@ -65,6 +66,12 @@ export const routes: Routes = [
         canActivate: [superAdminGuard],
         loadComponent: () =>
           import('./features/admin/admin.component').then((m) => m.AdminComponent),
+      },
+      {
+        path: 'altas',
+        canActivate: [coordinadorGuard],
+        loadComponent: () =>
+          import('./features/altas/altas.component').then((m) => m.AltasComponent),
       },
     ],
   },

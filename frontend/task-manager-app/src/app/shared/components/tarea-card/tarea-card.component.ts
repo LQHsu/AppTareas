@@ -1,6 +1,16 @@
-import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  inject,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -8,10 +18,15 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import {
   TaskItemDto,
   TaskItemStatus,
+  TaskService,
+  TaskStatusHistoryDto,
   TASK_STATUS_LABELS,
+  fechaLimiteFromIso,
+  fechaLimiteToString,
 } from '../../../core/services/task.service';
 import { ProjectMemberDto } from '../../../core/services/project-member.service';
 import {
@@ -23,6 +38,7 @@ import {
 import { TaskCommentDto, TaskCommentService } from '../../../core/services/task-comment.service';
 import { EditorTextoComponent } from '../editor-texto/editor-texto.component';
 import { UserService } from '../../../core/services/user.service';
+import { RealtimeService } from '../../../core/services/realtime.service';
 
 // Tarjeta de tarea reutilizable: la usan tanto proyecto-detalle (donde
 // se conoce la lista de miembros del proyecto y se puede reasignar)
@@ -57,12 +73,13 @@ import { UserService } from '../../../core/services/user.service';
     MatSelectModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    MatDatepickerModule,
     EditorTextoComponent,
   ],
   templateUrl: './tarea-card.component.html',
   styleUrl: './tarea-card.component.scss',
 })
-export class TareaCardComponent {
+export class TareaCardComponent implements OnInit, OnDestroy {
   @Input({ required: true }) task!: TaskItemDto;
 
   // Si se pasa, el campo "Asignada a" se vuelve un select editable con
@@ -91,11 +108,16 @@ export class TareaCardComponent {
   }>();
   @Output() subtaskStatusChange = new EventEmitter<{ subtask: TaskItemDto; status: TaskItemStatus }>();
   @Output() subtaskCreate = new EventEmitter<{ title: string; assignedToId: string | null }>();
-  @Output() detailsChange = new EventEmitter<{ title: string; description: string | null }>();
+  @Output() detailsChange = new EventEmitter<{
+    title: string;
+    description: string | null;
+    fechaLimite: string | null;
+  }>();
   @Output() subtaskDetailsChange = new EventEmitter<{
     subtask: TaskItemDto;
     title: string;
     description: string | null;
+    fechaLimite: string | null;
   }>();
 
   statusOptions = Object.values(TaskItemStatus).filter(
@@ -112,10 +134,12 @@ export class TareaCardComponent {
   // - Creada/Asignada/Leida son automaticas (creacion, asignacion,
   //   apertura del modal). Solo quien creo la tarea (o el dueno del
   //   proyecto) las puede forzar a mano.
-  // - En atencion/Atendida: las mueve quien tiene la tarea asignada, o
-  //   quien la creo.
-  // - Volver a revisar/Terminada/Cancelada: decision de quien creo la
-  //   tarea (o el dueno del proyecto).
+  // - En atencion/Atendida/Volver a revisar: el ida-y-vuelta del avance,
+  //   lo mueve quien tiene la tarea asignada, o quien la creo - el
+  //   asignado necesita poder volver a mandarla a "Volver a revisar"
+  //   despues de corregirla, no solo saltar directo a Atendida.
+  // - Terminada/Cancelada: decision de quien creo la tarea (o el dueno
+  //   del proyecto).
   private get esCreador(): boolean {
     const uid = this.userService.currentUser()?.id;
     return !!uid && (this.task.createdById === uid || this.isProjectOwner);
@@ -126,6 +150,14 @@ export class TareaCardComponent {
     return !!uid && this.task.assignedToId === uid;
   }
 
+  // Asignar/reasignar es exclusivo de quien creo la tarea (a diferencia
+  // del estado, aqui ni el dueno del proyecto ni la persona asignada
+  // pueden cambiarlo). Mismo criterio que TasksController.UpdateAssignee.
+  get puedeAsignar(): boolean {
+    const uid = this.userService.currentUser()?.id;
+    return !!uid && this.task.createdById === uid;
+  }
+
   get puedeEditarEstado(): boolean {
     return this.esCreador || this.esAsignado;
   }
@@ -133,7 +165,11 @@ export class TareaCardComponent {
   puedeCambiarA(status: TaskItemStatus): boolean {
     if (this.esCreador) return true;
     if (this.esAsignado) {
-      return status === TaskItemStatus.EnAtencion || status === TaskItemStatus.Atendida;
+      return (
+        status === TaskItemStatus.EnAtencion ||
+        status === TaskItemStatus.Atendida ||
+        status === TaskItemStatus.VolverARevisar
+      );
     }
     return false;
   }
@@ -167,10 +203,14 @@ export class TareaCardComponent {
   editando = signal(false);
   edicionTitulo = '';
   edicionDescripcion: string | null = null;
+  // Date de mat-datepicker, o null si no tiene. Puramente informativa
+  // (ver comentario en TaskItem.cs) - no valida nada, no bloquea nada.
+  edicionFechaLimite: Date | null = null;
 
   entrarEdicion(): void {
     this.edicionTitulo = this.task.title;
     this.edicionDescripcion = this.task.description;
+    this.edicionFechaLimite = fechaLimiteFromIso(this.task.fechaLimite);
     this.editando.set(true);
   }
 
@@ -182,14 +222,58 @@ export class TareaCardComponent {
     const titulo = this.edicionTitulo.trim();
     if (!titulo) return;
 
-    this.detailsChange.emit({ title: titulo, description: this.edicionDescripcion });
+    this.detailsChange.emit({
+      title: titulo,
+      description: this.edicionDescripcion,
+      fechaLimite: fechaLimiteToString(this.edicionFechaLimite),
+    });
     this.editando.set(false);
   }
 
   constructor(
     private attachmentService: TaskAttachmentService,
-    private commentService: TaskCommentService
+    private commentService: TaskCommentService,
+    private taskService: TaskService,
+    private realtime: RealtimeService
   ) {}
+
+  // Comentarios en vivo: esta tarjeta solo se renderiza dentro del modal
+  // de detalle (tarea-detalle-dialog), asi que una sola instancia esta
+  // "viva" a la vez - suscribirse aca (filtrando por task.id, ya que
+  // taskChanged$/commentAdded$ traen eventos de CUALQUIER tarea) es
+  // mas simple que subir esto al padre.
+  private commentSubs = new Subscription();
+
+  ngOnInit(): void {
+    this.commentSubs.add(
+      this.realtime.commentAdded$.subscribe((comment) => {
+        if (comment.taskId !== this.task.id) return;
+        // Si la seccion nunca se abrio, no hay nada que actualizar: no
+        // tocar `comments` aca deja su length en 0, asi que toggleComments
+        // sigue disparando loadComments() (que ya trae este comentario
+        // incluido) la primera vez que se abra. Si ya esta abierta, dedupe
+        // por id - el propio autor puede recibir este mismo broadcast
+        // ademas de la respuesta de su propio POST (ver onPostComment,
+        // que dedupea igual del otro lado), y no hay garantia de cual de
+        // los dos llega primero.
+        if (!this.showComments()) return;
+        this.comments.update((list) =>
+          list.some((c) => c.id === comment.id) ? list : [...list, comment]
+        );
+      })
+    );
+
+    this.commentSubs.add(
+      this.realtime.commentDeleted$.subscribe(({ taskId, commentId }) => {
+        if (taskId !== this.task.id || !this.showComments()) return;
+        this.comments.update((list) => list.filter((c) => c.id !== commentId));
+      })
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.commentSubs.unsubscribe();
+  }
 
   toggleAddSubtask(): void {
     this.showAddSubtask = !this.showAddSubtask;
@@ -326,7 +410,16 @@ export class TareaCardComponent {
 
     this.commentService.create(this.task.id, content).subscribe({
       next: (posted) => {
-        this.comments.update((list) => [...list, posted]);
+        // Dedupe por id, igual que el handler de commentAdded$ arriba:
+        // el broadcast de SignalR de este mismo comentario puede llegar
+        // ANTES que la respuesta de este POST (no hay garantia de orden
+        // entre HTTP y WebSocket) - sin esto, cuando eso pasaba, este
+        // callback lo volvia a agregar sin chequear si ya estaba,
+        // duplicandolo visualmente hasta cerrar y reabrir el modal (que
+        // vuelve a traer la lista real via loadComments).
+        this.comments.update((list) =>
+          list.some((c) => c.id === posted.id) ? list : [...list, posted]
+        );
         this.newCommentText = '';
         this.postingComment.set(false);
       },
@@ -344,6 +437,39 @@ export class TareaCardComponent {
       },
       error: () => {
         this.commentError.set('No se pudo eliminar el comentario.');
+      },
+    });
+  }
+
+  // --- Historial de estados ---
+  // Quien cambio a cada estado y cuando (ver TasksController.
+  // GetStatusHistory) - independiente de quien tenga la tarea asignada
+  // ahora mismo: cada fila queda fija al momento en que ocurrio.
+
+  showHistorial = signal(false);
+  loadingHistorial = signal(false);
+  historial = signal<TaskStatusHistoryDto[]>([]);
+  historialError = signal<string | null>(null);
+
+  toggleHistorial(): void {
+    const opening = !this.showHistorial();
+    this.showHistorial.set(opening);
+
+    if (opening && this.historial().length === 0) {
+      this.loadHistorial();
+    }
+  }
+
+  private loadHistorial(): void {
+    this.loadingHistorial.set(true);
+    this.taskService.getStatusHistory(this.task.id).subscribe({
+      next: (list) => {
+        this.historial.set(list);
+        this.loadingHistorial.set(false);
+      },
+      error: () => {
+        this.loadingHistorial.set(false);
+        this.historialError.set('No se pudo cargar el historial.');
       },
     });
   }

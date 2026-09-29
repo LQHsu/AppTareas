@@ -13,8 +13,11 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ProjectService, ProjectDto } from '../../core/services/project.service';
 import { FolderService, FolderDto } from '../../core/services/folder.service';
+import { AuthService } from '../../core/services/auth.service';
 import { EditorTextoComponent } from '../../shared/components/editor-texto/editor-texto.component';
+import { ColorPickerComponent } from '../../shared/components/color-picker/color-picker.component';
 import { TextoPlanoPipe } from '../../shared/pipes/texto-plano.pipe';
+import { bannerColor, contrastTextColor } from '../../shared/color-palette';
 
 // Filtro de la barra de carpetas: 'all' = todos los proyectos,
 // 'none' = los que no estan en ninguna carpeta, o el id de una carpeta.
@@ -38,6 +41,7 @@ type FiltroCarpeta = 'all' | 'none' | string;
     MatMenuModule,
     MatTooltipModule,
     EditorTextoComponent,
+    ColorPickerComponent,
     TextoPlanoPipe,
   ],
   templateUrl: './proyectos.component.html',
@@ -59,9 +63,25 @@ export class ProyectosComponent implements OnInit {
 
   form!: ReturnType<FormBuilder['group']>;
 
+  // Texto blanco/oscuro segun el color de fondo elegido para el titulo.
+  tituloTextColor = contrastTextColor;
+  // Color del banner superior de la card (estilo Google Classroom): el
+  // propio del proyecto, o un azul por default si no eligio ninguno.
+  bannerColor = bannerColor;
+
   // Solo las carpetas propias sirven como destino para mover proyectos:
   // el backend rechaza mover a una carpeta ajena.
   carpetasPropias = computed(() => this.folders().filter((f) => f.isOwner));
+
+  // El menu "Mover a oficina" solo tiene sentido para el dueno del
+  // proyecto: ProjectsController.MoveToFolder rechaza con 403 a
+  // cualquier otro miembro (mover proyectos ajenos seria una puerta
+  // trasera para invitar gente a un proyecto que no es tuyo). Esto es
+  // solo UX -sin este chequeo el boton salia igual para todos y solo
+  // fallaba al hacer click-, la validacion real sigue siendo del backend.
+  esDueno(project: ProjectDto): boolean {
+    return project.ownerId === this.auth.getUserId();
+  }
 
   projectsFiltrados = computed(() => {
     const filtro = this.filtroCarpeta();
@@ -85,11 +105,13 @@ export class ProyectosComponent implements OnInit {
     private fb: FormBuilder,
     private projectService: ProjectService,
     private folderService: FolderService,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private auth: AuthService
   ) {
     this.form = this.fb.group({
       name: ['', Validators.required],
       description: [''],
+      color: [null as string | null],
     });
   }
 
@@ -120,7 +142,7 @@ export class ProyectosComponent implements OnInit {
   loadFolders(): void {
     this.folderService.getMine().subscribe({
       next: (folders) => this.folders.set(folders),
-      error: () => this.errorMessage.set('No se pudieron cargar las carpetas.'),
+      error: () => this.errorMessage.set('No se pudieron cargar las oficinas.'),
     });
   }
 
@@ -146,6 +168,7 @@ export class ProyectosComponent implements OnInit {
         name: this.form.value.name!,
         description: this.form.value.description || null,
         folderId,
+        color: this.form.value.color || null,
       })
       .subscribe({
         next: (newProject) => {

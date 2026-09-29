@@ -127,14 +127,20 @@ export class CompletarRegistroComponent implements OnInit {
         },
         error: (err) => {
           this.submitting.set(false);
-          this.errorMessage.set(
-            err.status === 409
-              ? 'Tu usuario ya estaba registrado. Redirigiendo...'
-              : 'Ocurrió un error al completar tu registro. Intenta de nuevo.'
-          );
 
           if (err.status === 409) {
+            this.errorMessage.set('Tu usuario ya estaba registrado. Redirigiendo...');
             setTimeout(() => this.router.navigate(['/proyectos']), 1500);
+          } else if (err.status === 403 && err.error?.error === 'not_whitelisted') {
+            // Numero economico valido en Keycloak/CUSXACDI, pero nadie lo
+            // dio de alta todavia (ver CoordinadorController) - no es un
+            // error tecnico, hay que avisarle a su coordinador de area.
+            this.errorMessage.set(
+              err.error?.message ??
+                'Tu número económico no está dado de alta en el sistema. Contacta a tu coordinador de área.'
+            );
+          } else {
+            this.errorMessage.set('Ocurrió un error al completar tu registro. Intenta de nuevo.');
           }
         },
       });

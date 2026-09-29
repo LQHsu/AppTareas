@@ -75,6 +75,24 @@
   gap: 8px;
 }
 
+/* ---------- Edicion inline (nombre + color) ---------- */
+
+.editar-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  // La card ya no trae padding propio (el banner necesita ir a los
+  // bordes) - el formulario de edicion, que reemplaza al banner+body
+  // por completo mientras se edita, se lo pone el mismo.
+  padding: 18px;
+}
+
+.editar-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* ---------- Tarjetas ---------- */
 
 .carpetas-grid {
@@ -86,25 +104,34 @@
 .carpeta-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px;
+  padding: 0;
   border: 1px solid var(--app-border);
   box-shadow: none;
+  // overflow: hidden recorta el banner (esquinas cuadradas) al radio de
+  // la card, sin tener que duplicar a mano el valor del radio de
+  // mat-card — mismo truco que en proyecto-card.
+  overflow: hidden;
 }
 
-.carpeta-card--ajena {
+.carpeta-card--ajena .carpeta-card__body {
   background: var(--app-surface-subtle);
 }
 
-.carpeta-card__head {
+// Franja superior con el color de la carpeta (estilo Google Classroom):
+// ocupa todo el ancho de la card, no solo el texto del titulo.
+.carpeta-card__banner {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 16px 18px;
 }
 
 .carpeta-card__icono {
   flex: none;
-  color: var(--app-blue);
+  // Sobre el banner de color hereda el mismo color de texto (blanco u
+  // oscuro segun contraste, calculado en el componente) en vez del azul
+  // fijo que tenia antes sobre fondo blanco.
+  color: inherit;
 }
 
 .carpeta-card__nombre {
@@ -115,6 +142,34 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  color: inherit;
+}
+
+.carpeta-card__menu-btn {
+  flex: none;
+  color: inherit;
+}
+
+.carpeta-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px 18px;
+  // flex:1 para que "Ver proyectos" (margin-top:auto) siga pegado al
+  // fondo de la card cuando el grid estira todas a la misma altura.
+  flex: 1;
+}
+
+// "Ver proyectos" hereda el color de la carpeta (o el azul por default,
+// via bannerColor()) en vez del gris neutro de mat-stroked-button.
+.carpeta-card__ver-btn {
+  border-color: var(--btn-color) !important;
+  color: var(--btn-color) !important;
+
+  &:hover {
+    background: color-mix(in srgb, var(--btn-color) 10%, white);
+  }
 }
 
 .carpeta-card__stats {

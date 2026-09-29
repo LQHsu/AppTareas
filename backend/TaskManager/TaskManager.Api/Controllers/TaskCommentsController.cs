@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.DTOs;
+using TaskManager.Api.Hubs;
 using TaskManager.Domain.Entities;
 using TaskManager.Infrastructure;
 
@@ -15,10 +17,37 @@ public class TaskCommentsController : ControllerBase
     private const int MaxContentLength = 4000;
 
     private readonly AppDbContext _db;
+    private readonly IHubContext<TaskHub> _hub;
 
-    public TaskCommentsController(AppDbContext db)
+    public TaskCommentsController(AppDbContext db, IHubContext<TaskHub> hub)
     {
         _db = db;
+        _hub = hub;
+    }
+
+    // Mismos grupos que TasksController.NotificarCambio: el grupo del
+    // proyecto (cubre a cualquier miembro viendo el tablero, aunque no
+    // sea creador/asignado de ESTA tarea puntual) + el creador y el
+    // asignado (cubre "Mis tareas", que no se une a ningun grupo de
+    // proyecto). Un Set evita mandar el mismo evento dos veces a la
+    // misma conexion si, por ejemplo, el creador tambien es miembro.
+    private Task NotificarComentario<T>(TaskItem task, T payload, string eventName)
+    {
+        var grupos = new HashSet<string>();
+
+        if (task.ProjectId.HasValue)
+        {
+            grupos.Add(TaskHubGroups.Project(task.ProjectId.Value));
+        }
+
+        grupos.Add(TaskHubGroups.User(task.CreatedById));
+
+        if (task.AssignedToId is not null)
+        {
+            grupos.Add(TaskHubGroups.User(task.AssignedToId));
+        }
+
+        return Task.WhenAll(grupos.Select(g => _hub.Clients.Group(g).SendAsync(eventName, payload)));
     }
 
     // GET /api/tasks/{taskId}/comments
@@ -70,7 +99,11 @@ public class TaskCommentsController : ControllerBase
         await _db.SaveChangesAsync();
 
         var full = await _db.TaskComments.Include(c => c.User).FirstAsync(c => c.Id == comment.Id);
-        return CreatedAtAction(nameof(GetByTask), new { taskId }, ToDto(full));
+        var resultDto = ToDto(full);
+
+        await NotificarComentario(task, resultDto, "CommentAdded");
+
+        return CreatedAtAction(nameof(GetByTask), new { taskId }, resultDto);
     }
 
     // DELETE /api/tasks/{taskId}/comments/{commentId}
@@ -94,6 +127,8 @@ public class TaskCommentsController : ControllerBase
 
         _db.TaskComments.Remove(comment);
         await _db.SaveChangesAsync();
+
+        await NotificarComentario(task, new CommentDeletedDto(taskId, commentId), "CommentDeleted");
 
         return NoContent();
     }

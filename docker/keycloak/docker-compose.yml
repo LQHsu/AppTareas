@@ -51,6 +51,17 @@ services:
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      # Default de Keycloak: 2592000s (30 dias) de Cache-Control en los
+      # estaticos del theme (css/js/img), bajo una URL con un hash de
+      # VERSION FIJO por release de Keycloak (no cambia con el contenido
+      # ni con un restart) - mientras se sigue iterando el theme de
+      # login, eso deja cualquier cache intermedia (proxy institucional,
+      # etc.) sirviendo la copia vieja por semanas sin que un restart o
+      # un hard-refresh del usuario lo arreglen. 300s (5 min) es
+      # suficiente para no perder el beneficio de cache en uso normal,
+      # pero corto para no volver a bloquear un cambio real. Subir esto
+      # de nuevo (o quitarlo) una vez que el theme deje de cambiar seguido.
+      KC_SPI_THEME_STATIC_MAX_AGE: "300"
     volumes:
       # Export del realm (Fase 2) - se importa solo al arrancar (--import-realm).
       - ./import:/opt/keycloak/data/import

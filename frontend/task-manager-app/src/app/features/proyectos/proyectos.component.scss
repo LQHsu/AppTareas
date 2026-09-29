@@ -92,30 +92,45 @@
 }
 
 .proyecto-card {
-  padding: 18px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   cursor: pointer;
-  transition: box-shadow 0.15s ease, background-color 0.15s ease;
+  transition: box-shadow 0.15s ease;
+  // Recorta el banner (esquinas cuadradas) al radio de la card, sin
+  // tener que duplicar a mano el valor del radio de mat-card.
+  overflow: hidden;
+}
+
+// Circulo con el color de LA CARPETA a la que pertenece el proyecto,
+// dentro del banner: asi se ve de un vistazo a que carpeta pertenece
+// aunque el banner (color PROPIO del proyecto) sea del mismo tono. El
+// anillo blanco es para que no se pierda contra un banner de color
+// parecido.
+.proyecto-card__circulo {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex: none;
+  align-self: center;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .proyecto-card:hover {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
-  // La tarjeta en reposo es blanca (--mat-card-elevated-container-color
-  // forzado en styles.scss); al pasar el mouse/tocarla vuelve a mostrar
-  // el tinte que Material genera por default, como retroalimentacion de
-  // que es clicable.
-  background: var(--mat-sys-surface-container-low);
-}
-
-.proyecto-card:active {
-  background: var(--mat-sys-surface-container);
 }
 
 .proyecto-card h3 {
   margin: 0;
   font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
 }
 
 /* ---------- Carpetas ---------- */
@@ -163,6 +178,25 @@
   font-weight: 500;
 }
 
+// Chip de una carpeta especifica: hereda el color elegido para esa
+// carpeta (o el azul por default si no eligio, via bannerColor()) en vez
+// del azul generico de arriba - asi el filtro combina con el banner de
+// la card de esa carpeta en /carpetas.
+.chip--carpeta {
+  border-color: var(--chip-color);
+  color: var(--chip-color);
+
+  &:hover {
+    background: color-mix(in srgb, var(--chip-color) 12%, white);
+  }
+}
+
+.chip--carpeta.chip--activo {
+  background: var(--chip-color);
+  color: var(--chip-text);
+  border-color: var(--chip-color);
+}
+
 .chip__count {
   padding: 0 6px;
   border-radius: 999px;
@@ -193,11 +227,22 @@
 
 /* ---------- Tarjeta de proyecto ---------- */
 
-.proyecto-card__head {
+// Franja superior con el color PROPIO del proyecto (estilo Google
+// Classroom): ocupa todo el ancho de la card, no solo el texto del
+// titulo.
+.proyecto-card__banner {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+}
+
+.proyecto-card__body {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  padding: 14px 18px 18px;
+  flex: 1;
 }
 
 .proyecto-card__menu {
@@ -207,12 +252,15 @@
   border: 0;
   border-radius: 6px;
   background: none;
-  color: var(--app-text-subtle);
+  // Sobre el banner de color hereda el mismo color de texto (blanco u
+  // oscuro segun contraste) en vez del gris fijo que tenia antes.
+  color: inherit;
   cursor: pointer;
+  opacity: 0.85;
 
   &:hover {
-    background: rgba(0, 0, 0, 0.06);
-    color: var(--app-text);
+    background: rgba(255, 255, 255, 0.2);
+    opacity: 1;
   }
 }
 
@@ -232,6 +280,14 @@
     width: 13px;
     height: 13px;
   }
+}
+
+.proyecto-carpeta__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
 }
 
 .proyecto-desc {

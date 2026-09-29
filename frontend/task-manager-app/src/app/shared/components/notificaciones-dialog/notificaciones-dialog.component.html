@@ -1,0 +1,28 @@
+<h2 mat-dialog-title>Notificaciones</h2>
+
+<mat-dialog-content class="notificaciones__body">
+  <p class="notificaciones__lede">
+    Elige por qué canal quieres que te avisemos cuando te asignen una tarea. Puedes activar los dos, uno solo, o ninguno.
+  </p>
+
+  <div class="notificaciones__opcion">
+    <div class="notificaciones__opcion-texto">
+      <span class="notificaciones__opcion-titulo">Correo</span>
+      <span class="notificaciones__opcion-ayuda">Se manda a tu correo institucional.</span>
+    </div>
+    <mat-slide-toggle [checked]="notifyByEmail()" (change)="notifyByEmail.set($event.checked)"></mat-slide-toggle>
+  </div>
+
+  <div class="notificaciones__opcion">
+    <div class="notificaciones__opcion-texto">
+      <span class="notificaciones__opcion-titulo">Google Chat</span>
+      <span class="notificaciones__opcion-ayuda">Requiere haber vinculado tu cuenta con el bot de AppTareas.</span>
+    </div>
+    <mat-slide-toggle [checked]="notifyByChat()" (change)="notifyByChat.set($event.checked)"></mat-slide-toggle>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Cancelar</button>
+  <button mat-flat-button (click)="guardar()">Guardar</button>
+</mat-dialog-actions>
