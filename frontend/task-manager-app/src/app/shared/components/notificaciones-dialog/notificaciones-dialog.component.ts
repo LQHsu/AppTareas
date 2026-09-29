@@ -32,7 +32,7 @@ export class NotificacionesDialogComponent {
     @Inject(MAT_DIALOG_DATA) public data: NotificacionesDialogData
   ) {
 
-    this.notifyByEmail.set(data .notifyByEmail)
+    this.notifyByEmail.set(data.notifyByEmail)
     this.notifyByChat.set(data.notifyByChat )
   }
 

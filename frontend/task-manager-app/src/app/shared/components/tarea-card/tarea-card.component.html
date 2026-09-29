@@ -11,8 +11,10 @@
         />
       } @else {
         <h3 class="tarea__title">{{ task.title }}</h3>
+        <div>
         <span class="badge badge--{{ statusTone(task.status) }}">
           {{ statusLabels[task.status] }}
+          
         </span>
         @if (!estaPausada) {
           <button
@@ -37,7 +39,7 @@
           >
             <mat-icon>delete_outline</mat-icon>
           </button>
-        }
+        }</div>
       }
     </div>
 
