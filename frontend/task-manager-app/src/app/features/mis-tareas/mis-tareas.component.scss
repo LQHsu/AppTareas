@@ -33,6 +33,11 @@
   margin: 0;
 }
 
+.mis-tareas-header__acciones {
+  display: flex;
+  gap: 8px;
+}
+
 .create-card {
   padding: 20px;
   margin-bottom: 20px;

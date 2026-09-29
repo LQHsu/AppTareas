@@ -46,22 +46,46 @@
   gap: 6px 18px;
 }
 
-.btn-editar {
+// .btn-borrar hereda todo de .btn-editar salvo el color de hover (rojo
+// en vez de azul, para diferenciar la accion destructiva aunque sea
+// reversible desde la papelera).
+.btn-editar,
+.btn-borrar {
   flex: none;
   width: 32px;
   height: 32px;
   padding: 0;
   color: var(--app-text-subtle);
 
-  &:hover {
-    color: var(--app-blue);
-  }
-
   mat-icon {
     font-size: 18px;
     width: 18px;
     height: 18px;
   }
+}
+
+.btn-editar:hover {
+  color: var(--app-blue);
+}
+
+.btn-borrar:hover {
+  color: var(--app-red);
+}
+
+// Aviso de "tarea pausada" (ver estaPausada) - mismo tono gris neutro
+// que el badge de ese estado (--estado-pausada, ver styles.scss), no
+// rojo/naranja de alerta: pausada no es un error, es un estado normal
+// del flujo.
+.aviso-pausada {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--estado-pausada-soft);
+  color: var(--estado-pausada);
+  font-size: 13px;
 }
 
 .input-titulo {
@@ -180,6 +204,12 @@
   background: var(--estado-cancelada-soft);
   border-color: var(--estado-cancelada);
   color: var(--estado-cancelada);
+}
+
+.badge--pausada {
+  background: var(--estado-pausada-soft);
+  border-color: var(--estado-pausada);
+  color: var(--estado-pausada);
 }
 
 /* ---------- Bloques / secciones ---------- */

@@ -1,10 +1,16 @@
 <div class="mis-tareas-page">
   <header class="mis-tareas-header">
     <h1>Mis tareas</h1>
-    <button mat-flat-button color="primary" (click)="toggleCreateTaskForm()">
-      <mat-icon>add</mat-icon>
-      Nueva tarea
-    </button>
+    <div class="mis-tareas-header__acciones">
+      <button mat-stroked-button (click)="abrirPapelera()" matTooltip="Tareas sueltas borradas por mí">
+        <mat-icon>delete_outline</mat-icon>
+        Papelera
+      </button>
+      <button mat-flat-button color="primary" (click)="toggleCreateTaskForm()">
+        <mat-icon>add</mat-icon>
+        Nueva tarea
+      </button>
+    </div>
   </header>
 
   @if (showCreateTaskForm()) {

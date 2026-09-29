@@ -27,6 +27,7 @@ const STATUS_COLORS: Record<TaskItemStatus, string> = {
   [TaskItemStatus.VolverARevisar]: 'var(--estado-volver-a-revisar)',
   [TaskItemStatus.Terminada]: 'var(--estado-terminada)',
   [TaskItemStatus.Cancelada]: 'var(--estado-cancelada)',
+  [TaskItemStatus.Pausada]: 'var(--estado-pausada)',
 };
 
 export interface DonutSegment {

@@ -102,6 +102,10 @@
     <mat-tab label="Tareas">
       <div class="tab-content">
         <div class="tab-actions">
+          <button mat-stroked-button (click)="abrirPapelera()" matTooltip="Tareas borradas de este proyecto">
+            <mat-icon>delete_outline</mat-icon>
+            Papelera
+          </button>
           <button mat-flat-button color="primary" (click)="toggleCreateTaskForm()">
             <mat-icon>add</mat-icon>
             Nueva tarea

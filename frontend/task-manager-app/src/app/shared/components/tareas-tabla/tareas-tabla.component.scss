@@ -400,3 +400,9 @@
   border-color: var(--estado-cancelada);
   color: var(--estado-cancelada);
 }
+
+::ng-deep .badge-estado--pausada {
+  background: var(--estado-pausada-soft);
+  border-color: var(--estado-pausada);
+  color: var(--estado-pausada);
+}

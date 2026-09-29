@@ -95,6 +95,13 @@ html {
   --estado-cancelada: #e02130;
   --estado-cancelada-soft: #fbe2e4;
 
+  // Agregado despues (ver v2 2026-09-29): gris neutro a proposito, para
+  // que "en pausa" no compita visualmente con los tonos de accion
+  // (morado/naranja) ni con los de cierre (verde/rojo) - es un estado de
+  // "nada esta pasando ahora", no un paso del flujo hacia adelante.
+  --estado-pausada: #64748b;
+  --estado-pausada-soft: #e9ecf0;
+
   --app-surface: #ffffff;
   // v2: mezcla clara de --app-contrast (no de --app-blue, para que se
   // distinga de --app-bg — mismo fondo "no blanco" pero un tono mas

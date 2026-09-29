@@ -120,6 +120,13 @@ export class TareaCardComponent implements OnInit, OnDestroy {
     fechaLimite: string | null;
   }>();
 
+  // Sin confirmacion nativa a proposito: es borrado logico (ver
+  // TaskItem.IsDeleted/papelera), un click de mas se deshace desde ahi,
+  // mismo criterio "instantaneo" que ya usan onDeleteComment/
+  // onDeleteAttachment en esta misma tarjeta.
+  @Output() deleteTask = new EventEmitter<void>();
+  @Output() subtaskDeleteRequest = new EventEmitter<TaskItemDto>();
+
   statusOptions = Object.values(TaskItemStatus).filter(
     (v) => typeof v === 'number'
   ) as TaskItemStatus[];
@@ -140,7 +147,10 @@ export class TareaCardComponent implements OnInit, OnDestroy {
   //   despues de corregirla, no solo saltar directo a Atendida.
   // - Terminada/Cancelada: decision de quien creo la tarea (o el dueno
   //   del proyecto).
-  private get esCreador(): boolean {
+  // Publico (no privado): el template lo usa directamente en el aviso de
+  // "tarea pausada" para decidir si mostrar el boton de reanudar o solo
+  // el mensaje de "pidele a quien la creo que la reanude".
+  get esCreador(): boolean {
     const uid = this.userService.currentUser()?.id;
     return !!uid && (this.task.createdById === uid || this.isProjectOwner);
   }
@@ -153,22 +163,53 @@ export class TareaCardComponent implements OnInit, OnDestroy {
   // Asignar/reasignar es exclusivo de quien creo la tarea (a diferencia
   // del estado, aqui ni el dueno del proyecto ni la persona asignada
   // pueden cambiarlo). Mismo criterio que TasksController.UpdateAssignee.
+  // estaPausada la bloquea para TODOS, incluido el creador (ver
+  // comentario en estaPausada) - primero hay que reanudarla.
   get puedeAsignar(): boolean {
     const uid = this.userService.currentUser()?.id;
-    return !!uid && this.task.createdById === uid;
+    return !this.estaPausada && !!uid && this.task.createdById === uid;
+  }
+
+  // Pausada congela la tarea (ver TasksController.UpdateStatus): mientras
+  // este en ese estado, la UNICA interaccion que sigue permitida en toda
+  // la tarjeta es que el creador (o el dueno del proyecto) la reanude -
+  // ni siquiera quien la tiene asignada puede tocar nada mas (editar,
+  // reasignar, comentar, subir adjuntos, agregar subtareas). El template
+  // usa este getter para ocultar esos controles en vez de solo
+  // deshabilitarlos, coherente con "solo se pueden ver los detalles".
+  get estaPausada(): boolean {
+    return this.task.status === TaskItemStatus.Pausada;
   }
 
   get puedeEditarEstado(): boolean {
+    if (this.estaPausada) return this.esCreador;
     return this.esCreador || this.esAsignado;
   }
 
+  // Borrar (a la papelera) es exclusivo de quien creo la tarea (o el
+  // dueno del proyecto) - mismo criterio que TasksController.Delete,
+  // mas restrictivo que puedeEditarEstado porque es mas drastico que
+  // cualquier cambio de estado que si le toca a quien la tiene asignada.
+  // No se bloquea por estaPausada: borrar (a la papelera) sigue siendo
+  // una decision administrativa de quien creo la tarea, no un "trabajo"
+  // sobre ella (el backend tampoco lo bloquea, ver TasksController.Delete).
+  get puedeBorrar(): boolean {
+    return this.esCreador;
+  }
+
   puedeCambiarA(status: TaskItemStatus): boolean {
+    // Mientras esta pausada, cambiar de estado (a lo que sea, incluido
+    // volver a Pausada) es exclusivo de quien creo la tarea - es la
+    // unica forma de "reanudarla". Mismo criterio que
+    // TasksController.UpdateStatus.
+    if (this.estaPausada) return this.esCreador;
     if (this.esCreador) return true;
     if (this.esAsignado) {
       return (
         status === TaskItemStatus.EnAtencion ||
         status === TaskItemStatus.Atendida ||
-        status === TaskItemStatus.VolverARevisar
+        status === TaskItemStatus.VolverARevisar ||
+        status === TaskItemStatus.Pausada
       );
     }
     return false;
@@ -186,6 +227,7 @@ export class TareaCardComponent implements OnInit, OnDestroy {
     [TaskItemStatus.VolverARevisar]: 'volver-a-revisar',
     [TaskItemStatus.Terminada]: 'terminada',
     [TaskItemStatus.Cancelada]: 'cancelada',
+    [TaskItemStatus.Pausada]: 'pausada',
   };
 
   statusTone(status: TaskItemStatus): string {

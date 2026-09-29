@@ -3,7 +3,7 @@ import * as signalR from '@microsoft/signalr';
 import { Subject } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
-import { TaskItemDto } from './task.service';
+import { TaskItemDto, TaskDeletedDto } from './task.service';
 import { CommentDeletedDto, TaskCommentDto } from './task-comment.service';
 
 // Conexion SignalR para recibir cambios de tareas en vivo. El hub
@@ -24,6 +24,11 @@ export class RealtimeService {
   private connection: signalR.HubConnection | null = null;
 
   readonly taskChanged$ = new Subject<TaskItemDto>();
+
+  // Se emite cuando alguien borra (logicamente) una tarea - quien tenga
+  // la lista abierta debe QUITAR esa fila, no esperar que llegue
+  // actualizada por taskChanged$ (ver TasksController.Delete).
+  readonly taskDeleted$ = new Subject<TaskDeletedDto>();
 
   // Comentarios en vivo (ver TaskCommentsController.NotificarComentario):
   // mismos grupos que taskChanged$ (proyecto del creador/asignado), asi
@@ -56,6 +61,10 @@ export class RealtimeService {
 
     this.connection.on('TaskChanged', (task: TaskItemDto) => {
       this.taskChanged$.next(task);
+    });
+
+    this.connection.on('TaskDeleted', (payload: TaskDeletedDto) => {
+      this.taskDeleted$.next(payload);
     });
 
     this.connection.on('CommentAdded', (comment: TaskCommentDto) => {

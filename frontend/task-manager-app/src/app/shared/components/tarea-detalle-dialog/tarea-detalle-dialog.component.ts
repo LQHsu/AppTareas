@@ -56,6 +56,7 @@ export class TareaDetalleDialogComponent {
     description: string | null;
     fechaLimite: string | null;
   }>();
+  @Output() deleteTask = new EventEmitter<TaskItemDto>();
 
   constructor(@Inject(MAT_DIALOG_DATA) public data: TareaDetalleDialogData) {
     this.task = signal<TaskItemDto>(this.data.task);

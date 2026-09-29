@@ -70,6 +70,13 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<TaskComment>().Property(c => c.UserId).HasMaxLength(UserIdMaxLength);
         modelBuilder.Entity<TaskItem>().Property(t => t.CreatedById).HasMaxLength(UserIdMaxLength);
         modelBuilder.Entity<TaskItem>().Property(t => t.AssignedToId).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<TaskItem>().Property(t => t.DeletedById).HasMaxLength(UserIdMaxLength);
+
+        // Papelera (ver comentario en TaskItem.IsDeleted): filtro global,
+        // ninguna consulta normal (GetByProject, GetMine, subtareas, etc.)
+        // vuelve a ver una tarea borrada sin pedirlo explicitamente. La
+        // papelera usa _db.Tasks.IgnoreQueryFilters() a proposito.
+        modelBuilder.Entity<TaskItem>().HasQueryFilter(t => !t.IsDeleted);
         modelBuilder.Entity<TaskStatusHistory>().Property(h => h.ChangedById).HasMaxLength(UserIdMaxLength);
         modelBuilder.Entity<AltaCoordinador>().Property(a => a.CreatedById).HasMaxLength(UserIdMaxLength);
         modelBuilder.Entity<AltaCoordinador>().Property(a => a.UserId).HasMaxLength(UserIdMaxLength);
@@ -170,7 +177,16 @@ public class AppDbContext : DbContext
             .WithMany(u => u.CreatedTasks)
             .HasForeignKey(t => t.CreatedById)
             .OnDelete(DeleteBehavior.Restrict);
- 
+
+        // Tercera FK hacia User (quien la borro) - misma razon Restrict
+        // que las dos de arriba, y sin ICollection inversa en User (no
+        // hace falta navegar "todo lo que borre esta persona").
+        modelBuilder.Entity<TaskItem>()
+            .HasOne(t => t.DeletedBy)
+            .WithMany()
+            .HasForeignKey(t => t.DeletedById)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // ProjectFolder: dos FKs hacia User (dueno y con quien se
         // comparte). Restrict por la misma razon que el resto —evitar
         // "multiple cascade paths" en SQL Server— y porque borrar un

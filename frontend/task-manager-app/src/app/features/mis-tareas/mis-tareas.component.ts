@@ -13,6 +13,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import {
   TaskService,
   TaskItemDto,
@@ -24,6 +25,7 @@ import { TaskCommentService } from '../../core/services/task-comment.service';
 import { TareasTablaComponent } from '../../shared/components/tareas-tabla/tareas-tabla.component';
 import { TareaDetalleDialogComponent } from '../../shared/components/tarea-detalle-dialog/tarea-detalle-dialog.component';
 import { MarcarAtendidaDialogComponent } from '../../shared/components/marcar-atendida-dialog/marcar-atendida-dialog.component';
+import { PapeleraDialogComponent } from '../../shared/components/papelera-dialog/papelera-dialog.component';
 import { EditorTextoComponent } from '../../shared/components/editor-texto/editor-texto.component';
 import { RealtimeService } from '../../core/services/realtime.service';
 
@@ -50,6 +52,7 @@ import { RealtimeService } from '../../core/services/realtime.service';
     MatProgressSpinnerModule,
     MatDatepickerModule,
     MatDialogModule,
+    MatTooltipModule,
     TareasTablaComponent,
     EditorTextoComponent,
   ],
@@ -88,6 +91,7 @@ export class MisTareasComponent implements OnInit, OnDestroy {
   }
 
   private realtimeSub?: Subscription;
+  private realtimeDeleteSub?: Subscription;
 
   ngOnInit(): void {
     this.loadTasks();
@@ -99,10 +103,14 @@ export class MisTareasComponent implements OnInit, OnDestroy {
     // justo lo que "Mis tareas" necesita (asignadas a mi o creadas por
     // mi, sin importar el proyecto).
     this.realtimeSub = this.realtime.taskChanged$.subscribe((t) => this.applyRealtimeUpdate(t));
+    this.realtimeDeleteSub = this.realtime.taskDeleted$.subscribe((d) =>
+      this.tasks.update((list) => list.filter((t) => t.id !== d.id))
+    );
   }
 
   ngOnDestroy(): void {
     this.realtimeSub?.unsubscribe();
+    this.realtimeDeleteSub?.unsubscribe();
   }
 
   // Si la tarea ahora me pertenece (asignada o creada por mi), la
@@ -300,6 +308,44 @@ export class MisTareasComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Borrado logico (ver TaskItem.IsDeleted/papelera): quita la tarea de
+  // la lista local apenas se confirma, sin esperar al evento
+  // "TaskDeleted" de SignalR (ese es para que OTRAS pestañas/personas se
+  // enteren, ver ngOnInit). onDone cierra el dialog de detalle si el
+  // borrado se disparo desde ahi.
+  onDeleteTask(task: TaskItemDto, onDone?: () => void): void {
+    this.taskService.delete(task.id).subscribe({
+      next: () => {
+        this.tasks.update((list) => list.filter((t) => t.id !== task.id));
+        onDone?.();
+      },
+      error: () => {
+        this.errorMessage.set('No se pudo mover la tarea a la papelera.');
+      },
+    });
+  }
+
+  // Papelera de tareas sueltas (sin projectId - ver TasksController.
+  // GetTrash): las de proyecto se restauran desde la papelera de ESE
+  // proyecto en proyecto-detalle, no desde aca.
+  abrirPapelera(): void {
+    const ref = this.dialog.open(PapeleraDialogComponent, {
+      data: {},
+      width: '640px',
+      maxWidth: '95vw',
+      autoFocus: false,
+    });
+
+    ref.componentInstance.restored.subscribe((restored) => {
+      this.tasks.update((list) => {
+        const myId = this.userService.currentUser()?.id;
+        const esMia = myId !== undefined && (restored.assignedToId === myId || restored.createdById === myId);
+        if (!esMia || list.some((t) => t.id === restored.id)) return list;
+        return [restored, ...list];
+      });
+    });
+  }
+
   // Aqui las tareas nunca traen subtareas (GetMine es plano) y el
   // asignado se muestra de solo lectura (sin `members`), asi que solo
   // hacen falta statusChange y detailsChange.
@@ -323,6 +369,7 @@ export class MisTareasComponent implements OnInit, OnDestroy {
     ref.componentInstance.detailsChange.subscribe((v) =>
       this.onTaskDetailsChange(task, v, refresh)
     );
+    ref.componentInstance.deleteTask.subscribe((t) => this.onDeleteTask(t, () => ref.close()));
   }
 
   // Transicion automatica Asignada -> Leida al abrir el modal (ver mismo

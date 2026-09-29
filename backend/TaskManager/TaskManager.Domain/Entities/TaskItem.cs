@@ -45,7 +45,19 @@ public class TaskItem
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
- 
+
+    // Borrado logico (papelera, ver TasksController.Delete/Restore):
+    // nunca se hace un DELETE real, asi que un borrado por error siempre
+    // se puede deshacer. Filtrado por un HasQueryFilter global en
+    // AppDbContext (!IsDeleted) - todo el resto del codigo (GetByProject,
+    // GetMine, etc.) sigue sin ver tareas borradas sin tener que acordarse
+    // de excluirlas a mano en cada query nueva; la papelera consulta con
+    // IgnoreQueryFilters() a proposito.
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedById { get; set; }
+    public User? DeletedBy { get; set; }
+
     public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
     public ICollection<TaskAttachment> Attachments { get; set; } = new List<TaskAttachment>();
     public ICollection<TaskStatusHistory> StatusHistory { get; set; } = new List<TaskStatusHistory>();

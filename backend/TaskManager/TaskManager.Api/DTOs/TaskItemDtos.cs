@@ -79,3 +79,27 @@ public record TaskStatusHistoryDto(
     string ChangedByFullName,
     DateTime ChangedAt
 );
+
+// Fila de la papelera (ver TasksController.GetTrash/Restore/DeletePermanently).
+// DTO propio en vez de reusar TaskItemDto: la papelera no necesita
+// subtareas/conteos/status-history, solo lo minimo para decidir "esta es
+// la que borre por error, restaurarla" o "borrarla para siempre".
+// Payload del evento SignalR "TaskDeleted" (ver TasksController.Delete):
+// deliberadamente minimo, solo lo que necesita quien tiene la lista
+// abierta para quitar la fila de encima sin tener que volver a pedir
+// todo. ParentTaskId: si es una subtarea, el frontend sabe de que padre
+// colgaba para quitarla de su lista de Subtasks en vez de la raiz.
+public record TaskDeletedDto(Guid Id, Guid? ParentTaskId, Guid? ProjectId);
+
+public record TaskTrashItemDto(
+    Guid Id,
+    Guid? ProjectId,
+    string? ProjectName,
+    Guid? ParentTaskId,
+    string Title,
+    TaskItemStatus Status,
+    string CreatedByFullName,
+    string? AssignedToFullName,
+    DateTime DeletedAt,
+    string DeletedByFullName
+);

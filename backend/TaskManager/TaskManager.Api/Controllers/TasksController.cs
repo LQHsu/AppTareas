@@ -37,7 +37,14 @@ public class TasksController : ControllerBase
     // no aparece en `task`/`dto`) tambien necesita el evento — si no, su
     // "Mis tareas" nunca se entera de que la tarea se le fue y se queda
     // mostrandola de mas hasta que refresque a mano.
-    private Task NotificarCambio(TaskItem task, TaskItemDto dto, string? avisarTambienA = null)
+    private Task NotificarCambio(TaskItem task, TaskItemDto dto, string? avisarTambienA = null) =>
+        NotificarEvento(task, dto, "TaskChanged", avisarTambienA);
+
+    // Generaliza el fan-out a grupos (proyecto + creador + asignado) que
+    // ya usaba NotificarCambio, para que Delete/Restore puedan mandar su
+    // propio nombre de evento ("TaskDeleted"/"TaskChanged") con un
+    // payload distinto sin duplicar la logica de a quien avisar.
+    private Task NotificarEvento(TaskItem task, object payload, string evento, string? avisarTambienA = null)
     {
         var grupos = new HashSet<string>();
 
@@ -58,8 +65,18 @@ public class TasksController : ControllerBase
             grupos.Add(TaskHubGroups.User(avisarTambienA));
         }
 
-        return Task.WhenAll(grupos.Select(g => _hub.Clients.Group(g).SendAsync("TaskChanged", dto)));
+        return Task.WhenAll(grupos.Select(g => _hub.Clients.Group(g).SendAsync(evento, payload)));
     }
+
+    // Misma regla en los tres lugares que la necesitan (UpdateStatus la
+    // tiene inline por su propio switch de estados; Delete/Restore la
+    // reusan tal cual): quien creo la tarea, o el dueno del proyecto
+    // (cuenta como creador aunque no la haya creado el mismo), puede
+    // borrarla/restaurarla. Quien la tiene asignada NO puede - borrar es
+    // una decision mas drastica que cualquiera de las que si le tocan
+    // (ver switch en UpdateStatus).
+    private static bool EsCreador(TaskItem task, string userId) =>
+        task.CreatedById == userId || (task.ProjectId.HasValue && task.Project!.OwnerId == userId);
 
     // GET /api/tasks?projectId=xxx
     // Todas las tareas de un proyecto son visibles para cualquier
@@ -161,6 +178,8 @@ public class TasksController : ControllerBase
             if (parent is null) return BadRequest("Tarea padre invalida.");
             if (parent.ParentTaskId.HasValue)
                 return BadRequest("No se pueden anidar subtareas de subtareas (solo se permite un nivel).");
+            if (parent.Status == TaskItemStatus.Pausada)
+                return Conflict("La tarea padre esta pausada. Reanudala antes de agregarle subtareas.");
 
             // Mismo criterio de autorizacion que actualizar la tarea padre.
             if (parent.ProjectId.HasValue)
@@ -280,6 +299,14 @@ public class TasksController : ControllerBase
         var task = await _db.Tasks
             .Include(t => t.Project)
             .ThenInclude(p => p!.Folder)
+            // Owner del proyecto y de la oficina: solo hacen falta para
+            // los avisos de Atendida/VolverARevisar (ver mas abajo,
+            // TaskNotificationService.PersonasImportantes).
+            .Include(t => t.Project)
+            .ThenInclude(p => p!.Owner)
+            .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
+            .ThenInclude(f => f!.Owner)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .Include(t => t.StatusHistory)
@@ -310,25 +337,36 @@ public class TasksController : ControllerBase
         // - Creada/Asignada/Leida son automaticas (se ponen solas al
         //   crear, asignar, o abrir el modal — ver Create/UpdateAssignee
         //   /MarkRead). Solo el creador las puede forzar a mano.
-        // - En atencion/Atendida/Volver a revisar: el ida-y-vuelta del
-        //   avance del trabajo, lo marca quien la tiene asignada (o el
+        // - En atencion/Atendida/Volver a revisar/Pausada: el ida-y-vuelta
+        //   del avance del trabajo, lo marca quien la tiene asignada (o el
         //   creador) - el creador la manda a "Volver a revisar" cuando
         //   no quedo bien, y el asignado necesita poder mandarla de
         //   vuelta el mismo camino despues de corregirla (no solo saltar
-        //   a Atendida), sin que el creador tenga que intervenir.
+        //   a Atendida), sin que el creador tenga que intervenir. Pausada
+        //   entra en el mismo grupo PARA ENTRAR (cualquiera de los dos
+        //   puede pausarla) - pero UNA VEZ pausada, la tarea queda
+        //   congelada (ver el "if" de abajo): la unica interaccion que
+        //   sigue permitida en toda la tarea es que el creador la
+        //   reanude, ni el asignado puede moverla desde ahi. Mismo
+        //   criterio en UpdateAssignee/UpdateDetails/
+        //   TaskCommentsController/TaskAttachmentsController, que
+        //   bloquean cualquier cambio mientras esta pausada.
         // - Terminada/Cancelada: cerrar el trabajo es decision de quien
         //   creo la tarea.
         var esCreador = task.CreatedById == userId
             || (task.ProjectId.HasValue && task.Project!.OwnerId == userId);
         var esAsignado = task.AssignedToId == userId;
+        var estabaPausada = task.Status == TaskItemStatus.Pausada;
 
-        var permitido = dto.Status switch
-        {
-            TaskItemStatus.Creada or TaskItemStatus.Asignada or TaskItemStatus.Leida => esCreador,
-            TaskItemStatus.EnAtencion or TaskItemStatus.Atendida or TaskItemStatus.VolverARevisar => esCreador || esAsignado,
-            TaskItemStatus.Terminada or TaskItemStatus.Cancelada => esCreador,
-            _ => false,
-        };
+        var permitido = estabaPausada
+            ? esCreador
+            : dto.Status switch
+            {
+                TaskItemStatus.Creada or TaskItemStatus.Asignada or TaskItemStatus.Leida => esCreador,
+                TaskItemStatus.EnAtencion or TaskItemStatus.Atendida or TaskItemStatus.VolverARevisar or TaskItemStatus.Pausada => esCreador || esAsignado,
+                TaskItemStatus.Terminada or TaskItemStatus.Cancelada => esCreador,
+                _ => false,
+            };
 
         if (!permitido) return Forbid();
 
@@ -343,6 +381,41 @@ public class TasksController : ControllerBase
         CambiarEstado(task, userId, dto.Status);
 
         await _db.SaveChangesAsync();
+
+        // Se reanuda: avisar a quien la tiene asignada (si sigue
+        // habiendo alguien asignado) que ya puede volver a trabajar en
+        // ella. Best-effort, igual que el aviso de asignacion.
+        if (estabaPausada && dto.Status != TaskItemStatus.Pausada && task.AssignedTo is not null)
+        {
+            await _notifications.NotifyTaskResumedAsync(task, task.AssignedTo);
+        }
+
+        // Leida/Atendida: avisa a las "personas importantes" (creador,
+        // dueno del proyecto, dueno de la oficina - deduplicadas, ver
+        // PersonasImportantes). Leida normalmente llega por MarkRead (ver
+        // ese metodo, que dispara el mismo aviso al abrir el modal), pero
+        // el creador tambien la puede forzar a mano desde aca (ver el
+        // switch de permisos de arriba) - se cubre igual. userId (quien
+        // disparo el cambio) se excluye para no autonotificarse.
+        if (dto.Status == TaskItemStatus.Leida)
+        {
+            await _notifications.NotifyTaskReadAsync(task, userId);
+        }
+
+        if (dto.Status == TaskItemStatus.Atendida)
+        {
+            await _notifications.NotifyTaskAttendedAsync(task, userId);
+        }
+
+        // Volver a revisar: aviso inverso, para quien tiene la tarea
+        // asignada (no para "las personas importantes" - son ellas
+        // quienes piden la revision). Si quien la manda a revisar es la
+        // propia persona asignada (ver comentario del switch de
+        // permisos, arriba), no hace falta avisarle a si misma.
+        if (dto.Status == TaskItemStatus.VolverARevisar && task.AssignedTo is not null && task.AssignedToId != userId)
+        {
+            await _notifications.NotifyTaskNeedsReviewAsync(task, task.AssignedTo);
+        }
 
         var resultDto = ToDto(task, await CargarConteos([task.Id]));
         await NotificarCambio(task, resultDto);
@@ -432,6 +505,15 @@ public class TasksController : ControllerBase
         var task = await _db.Tasks
             .Include(t => t.Project)
             .ThenInclude(p => p!.Folder)
+            // Owner del proyecto y de la oficina: solo hacen falta aca
+            // para el aviso de "se leyo la tarea" (ver
+            // TaskNotificationService.PersonasImportantes), el resto del
+            // metodo no los usa.
+            .Include(t => t.Project)
+            .ThenInclude(p => p!.Owner)
+            .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
+            .ThenInclude(f => f!.Owner)
             .Include(t => t.CreatedBy)
             .Include(t => t.AssignedTo)
             .Include(t => t.StatusHistory)
@@ -453,6 +535,14 @@ public class TasksController : ControllerBase
 
             resultDto = ToDto(task, conteos);
             await NotificarCambio(task, resultDto);
+
+            // Avisa a las "personas importantes" (creador, dueno del
+            // proyecto, dueno de la oficina - deduplicadas, ver
+            // PersonasImportantes) que quien la tiene asignada ya la
+            // abrio. userId (quien la leyo) se excluye para no
+            // autonotificarse en el caso, comun, de que sea la misma
+            // persona en mas de un rol.
+            await _notifications.NotifyTaskReadAsync(task, userId);
         }
 
         return Ok(resultDto);
@@ -477,6 +567,8 @@ public class TasksController : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (task is null) return NotFound();
+        if (task.Status == TaskItemStatus.Pausada)
+            return Conflict("La tarea esta pausada. Reanudala antes de reasignarla.");
 
         // A diferencia de UpdateStatus/UpdateDetails, asignar (o
         // reasignar) una tarea es exclusivo de quien la creo: ni el
@@ -564,6 +656,8 @@ public class TasksController : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (task is null) return NotFound();
+        if (task.Status == TaskItemStatus.Pausada)
+            return Conflict("La tarea esta pausada. Reanudala antes de editarla.");
 
         if (task.ProjectId.HasValue)
         {
@@ -590,6 +684,155 @@ public class TasksController : ControllerBase
         // subtareas y el frontend conserva las que ya tenia cargadas.
         var resultDto = ToDto(task, await CargarConteos([task.Id]));
         await NotificarCambio(task, resultDto);
+
+        return Ok(resultDto);
+    }
+
+    // DELETE /api/tasks/{id}
+    // Borrado logico (ver TaskItem.IsDeleted): nunca se quita de la BD,
+    // solo se marca y desaparece de todas las vistas normales gracias al
+    // HasQueryFilter global en AppDbContext. Cascada de un nivel: sus
+    // subtareas (si tiene) se borran con ella, para no dejar hijas
+    // huerfanas colgando de un padre que ya no aparece en ningun lado -
+    // se restauran juntas tambien (ver Restore).
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var userId = GetUserIdFromToken();
+
+        var task = await _db.Tasks
+            .Include(t => t.Project)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        if (task is null) return NotFound();
+        if (!EsCreador(task, userId)) return Forbid();
+
+        var ahora = DateTime.UtcNow;
+        var subtareas = await _db.Tasks.Where(t => t.ParentTaskId == id).ToListAsync();
+
+        foreach (var sub in subtareas)
+        {
+            sub.IsDeleted = true;
+            sub.DeletedAt = ahora;
+            sub.DeletedById = userId;
+            sub.UpdatedAt = ahora;
+        }
+
+        task.IsDeleted = true;
+        task.DeletedAt = ahora;
+        task.DeletedById = userId;
+        task.UpdatedAt = ahora;
+
+        await _db.SaveChangesAsync();
+
+        // Evento propio (no TaskChanged): quien tiene la lista abierta
+        // debe QUITAR la fila, no actualizarla con datos que ya no
+        // deberia poder ver.
+        await NotificarEvento(task, new TaskDeletedDto(task.Id, task.ParentTaskId, task.ProjectId), "TaskDeleted");
+
+        return NoContent();
+    }
+
+    // GET /api/tasks/trash?projectId=xxx
+    // projectId presente: papelera de ESE proyecto (mismo criterio de
+    // visibilidad que GetByProject - cualquier miembro/dueno, no solo
+    // quien borro cada tarea). projectId ausente: papelera de tareas
+    // sueltas, solo las que el usuario actual creo (unica gente que
+    // pudo haberlas borrado, ver EsCreador para tareas sin proyecto).
+    [HttpGet("trash")]
+    public async Task<ActionResult<IEnumerable<TaskTrashItemDto>>> GetTrash([FromQuery] Guid? projectId)
+    {
+        var userId = GetUserIdFromToken();
+
+        var query = _db.Tasks.IgnoreQueryFilters().Where(t => t.IsDeleted);
+
+        if (projectId.HasValue)
+        {
+            var isMember = await _db.ProjectMembers.AnyAsync(m => m.ProjectId == projectId && m.UserId == userId);
+            var isOwner = await _db.Projects.AnyAsync(p => p.Id == projectId && p.OwnerId == userId);
+            if (!isMember && !isOwner) return Forbid();
+
+            query = query.Where(t => t.ProjectId == projectId);
+        }
+        else
+        {
+            query = query.Where(t => t.ProjectId == null && t.CreatedById == userId);
+        }
+
+        var papelera = await query
+            .Include(t => t.Project)
+            .Include(t => t.CreatedBy)
+            .Include(t => t.AssignedTo)
+            .Include(t => t.DeletedBy)
+            .OrderByDescending(t => t.DeletedAt)
+            .Select(t => new TaskTrashItemDto(
+                t.Id,
+                t.ProjectId,
+                t.Project!.Name,
+                t.ParentTaskId,
+                t.Title,
+                t.Status,
+                t.CreatedBy.FullName,
+                t.AssignedTo != null ? t.AssignedTo.FullName : null,
+                t.DeletedAt!.Value,
+                t.DeletedBy!.FullName
+            ))
+            .ToListAsync();
+
+        return Ok(papelera);
+    }
+
+    // POST /api/tasks/{id}/restore
+    // Deshace Delete: quita el marcado de borrada de la tarea y de las
+    // subtareas que se hayan ido con ella (ver comentario en Delete).
+    // No distingue si alguna subtarea se habia borrado por separado
+    // antes que su padre - restaurar el padre restaura todo lo que
+    // cuelgue de el, es el comportamiento mas predecible para quien
+    // recupera algo desde la papelera.
+    [HttpPost("{id:guid}/restore")]
+    public async Task<ActionResult<TaskItemDto>> Restore(Guid id)
+    {
+        var userId = GetUserIdFromToken();
+
+        var task = await _db.Tasks
+            .IgnoreQueryFilters()
+            .Include(t => t.Project)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        if (task is null) return NotFound();
+        if (!task.IsDeleted) return BadRequest("Esa tarea no esta en la papelera.");
+        if (!EsCreador(task, userId)) return Forbid();
+
+        var subtareas = await _db.Tasks
+            .IgnoreQueryFilters()
+            .Where(t => t.ParentTaskId == id && t.IsDeleted)
+            .ToListAsync();
+
+        foreach (var sub in subtareas)
+        {
+            sub.IsDeleted = false;
+            sub.DeletedAt = null;
+            sub.DeletedById = null;
+            sub.UpdatedAt = DateTime.UtcNow;
+        }
+
+        task.IsDeleted = false;
+        task.DeletedAt = null;
+        task.DeletedById = null;
+        task.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+
+        var full = await _db.Tasks
+            .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
+            .Include(t => t.CreatedBy)
+            .Include(t => t.AssignedTo)
+            .Include(t => t.StatusHistory)
+            .FirstAsync(t => t.Id == task.Id);
+
+        var resultDto = ToDto(full, await CargarConteos([full.Id]));
+        await NotificarCambio(full, resultDto);
 
         return Ok(resultDto);
     }

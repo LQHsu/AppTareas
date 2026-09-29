@@ -24,13 +24,17 @@ export interface NotificacionesDialogData {
   styleUrl: './notificaciones-dialog.component.scss',
 })
 export class NotificacionesDialogComponent {
-  notifyByEmail = signal(this.data.notifyByEmail);
-  notifyByChat = signal(this.data.notifyByChat);
+  notifyByEmail = signal(false);
+  notifyByChat = signal(false);
 
   constructor(
     public dialogRef: MatDialogRef<NotificacionesDialogComponent, UpdateNotificationPreferencesDto>,
     @Inject(MAT_DIALOG_DATA) public data: NotificacionesDialogData
-  ) {}
+  ) {
+
+    this.notifyByEmail.set(data .notifyByEmail)
+    this.notifyByChat.set(data.notifyByChat )
+  }
 
   guardar(): void {
     this.dialogRef.close({

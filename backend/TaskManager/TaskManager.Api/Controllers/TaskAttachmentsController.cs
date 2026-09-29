@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.DTOs;
 using TaskManager.Domain.Entities;
+using TaskManager.Domain.Enums;
 using TaskManager.Infrastructure;
 
 namespace TaskManager.Api.Controllers;
@@ -70,6 +71,8 @@ public class TaskAttachmentsController : ControllerBase
         var task = await _db.Tasks.Include(t => t.Project).FirstOrDefaultAsync(t => t.Id == taskId);
         if (task is null) return NotFound();
         if (!await CanAccessTask(task, userId)) return Forbid();
+        if (task.Status == TaskItemStatus.Pausada)
+            return Conflict("La tarea esta pausada. Reanudala antes de subir archivos.");
 
         if (file is null || file.Length == 0) return BadRequest("Archivo vacio.");
         if (file.Length > MaxFileSizeBytes)
@@ -149,6 +152,8 @@ public class TaskAttachmentsController : ControllerBase
 
         var task = await _db.Tasks.Include(t => t.Project).FirstOrDefaultAsync(t => t.Id == taskId);
         if (task is null) return NotFound();
+        if (task.Status == TaskItemStatus.Pausada)
+            return Conflict("La tarea esta pausada. Reanudala antes de borrar archivos.");
 
         var attachment = await _db.TaskAttachments.FirstOrDefaultAsync(a => a.Id == attachmentId && a.TaskId == taskId);
         if (attachment is null) return NotFound();

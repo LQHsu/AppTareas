@@ -13,6 +13,7 @@ export enum TaskItemStatus {
   VolverARevisar = 5,
   Terminada = 6,
   Cancelada = 7,
+  Pausada = 8,
 }
 
 export const TASK_STATUS_LABELS: Record<TaskItemStatus, string> = {
@@ -24,6 +25,7 @@ export const TASK_STATUS_LABELS: Record<TaskItemStatus, string> = {
   [TaskItemStatus.VolverARevisar]: 'Volver a revisar',
   [TaskItemStatus.Terminada]: 'Terminada',
   [TaskItemStatus.Cancelada]: 'Cancelada',
+  [TaskItemStatus.Pausada]: 'Pausada',
 };
 
 export interface TaskItemDto {
@@ -106,6 +108,30 @@ export function fechaLimiteFromIso(iso: string | null): Date | null {
   return new Date(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
 }
 
+// Fila de la papelera (ver TasksController.GetTrash) - DTO reducido,
+// sin subtareas/conteos/historial, solo lo necesario para decidir
+// restaurar o dejarla ahi.
+export interface TaskTrashItemDto {
+  id: string;
+  projectId: string | null;
+  projectName: string | null;
+  parentTaskId: string | null;
+  title: string;
+  status: TaskItemStatus;
+  createdByFullName: string;
+  assignedToFullName: string | null;
+  deletedAt: string;
+  deletedByFullName: string;
+}
+
+// Payload del evento SignalR "TaskDeleted" (ver RealtimeService) -
+// deliberadamente minimo, ver TaskDeletedDto en el backend.
+export interface TaskDeletedDto {
+  id: string;
+  parentTaskId: string | null;
+  projectId: string | null;
+}
+
 export interface CreateTaskDto {
   title: string;
   description: string | null;
@@ -166,5 +192,22 @@ export class TaskService {
   // Mas reciente primero (ver TasksController.GetStatusHistory).
   getStatusHistory(taskId: string): Observable<TaskStatusHistoryDto[]> {
     return this.http.get<TaskStatusHistoryDto[]>(`${this.baseUrl}/${taskId}/status-history`);
+  }
+
+  // Borrado logico (ver TaskItem.IsDeleted): la tarea (y sus subtareas)
+  // se van a la papelera, no se pierden. El aviso en vivo llega como
+  // "TaskDeleted" por RealtimeService, no como respuesta de este metodo.
+  delete(taskId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${taskId}`);
+  }
+
+  // projectId ausente: papelera de tareas sueltas creadas por mi.
+  getTrash(projectId?: string): Observable<TaskTrashItemDto[]> {
+    const query = projectId ? `?projectId=${projectId}` : '';
+    return this.http.get<TaskTrashItemDto[]>(`${this.baseUrl}/trash${query}`);
+  }
+
+  restore(taskId: string): Observable<TaskItemDto> {
+    return this.http.post<TaskItemDto>(`${this.baseUrl}/${taskId}/restore`, {});
   }
 }

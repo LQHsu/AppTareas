@@ -94,15 +94,19 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
   // Misma regla que TareaCardComponent.puedeCambiarA (ver ese
   // componente para el detalle de las reglas de negocio): quien creo la
   // tarea puede moverla a cualquier estado; quien la tiene asignada
-  // solo entre En atencion/Atendida/Volver a revisar; nadie mas puede
-  // tocarla desde aca.
+  // solo entre En atencion/Atendida/Volver a revisar/Pausada; nadie mas
+  // puede tocarla desde aca. Pausada congela la tarea: mientras este en
+  // ese estado, solo el creador puede volver a tocarla (reanudarla), ni
+  // siquiera el asignado.
   private opcionesEstadoPermitidas(task: TaskItemDto): TaskItemStatus[] {
     const uid = this.currentUserId;
-    if (uid !== null && task.createdById === uid) {
+    const esCreador = uid !== null && task.createdById === uid;
+
+    if (esCreador) {
       return Object.values(TaskItemStatus).filter((v) => typeof v === 'number') as TaskItemStatus[];
     }
-    if (uid !== null && task.assignedToId === uid) {
-      return [TaskItemStatus.EnAtencion, TaskItemStatus.Atendida, TaskItemStatus.VolverARevisar];
+    if (task.status !== TaskItemStatus.Pausada && uid !== null && task.assignedToId === uid) {
+      return [TaskItemStatus.EnAtencion, TaskItemStatus.Atendida, TaskItemStatus.VolverARevisar, TaskItemStatus.Pausada];
     }
     return [];
   }
@@ -379,6 +383,7 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
       [TaskItemStatus.VolverARevisar]: 'badge-estado--volver-a-revisar',
       [TaskItemStatus.Terminada]: 'badge-estado--terminada',
       [TaskItemStatus.Cancelada]: 'badge-estado--cancelada',
+      [TaskItemStatus.Pausada]: 'badge-estado--pausada',
     };
     const label = TASK_STATUS_LABELS[status];
     return `<span class="badge-estado ${clases[status]}">${label}</span>`;

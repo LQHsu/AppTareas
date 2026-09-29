@@ -18,6 +18,8 @@
     (subtaskCreate)="subtaskCreate.emit($event)"
     (detailsChange)="detailsChange.emit($event)"
     (subtaskDetailsChange)="subtaskDetailsChange.emit($event)"
+    (deleteTask)="deleteTask.emit(task())"
+    (subtaskDeleteRequest)="deleteTask.emit($event)"
   />
 </mat-dialog-content>
 

@@ -1,0 +1,59 @@
+<h2 mat-dialog-title>Papelera</h2>
+
+<mat-dialog-content class="papelera__body">
+  @if (errorMessage()) {
+    <p class="mensaje mensaje--error">{{ errorMessage() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="vacio">Cargando papelera…</p>
+  } @else if (items().length === 0) {
+    <p class="vacio">La papelera está vacía.</p>
+  } @else {
+    <ul class="papelera__lista">
+      @for (item of items(); track item.id) {
+        <li class="papelera__item">
+          <div class="papelera__info">
+            <span class="papelera__titulo">
+              @if (item.parentTaskId) {
+                <mat-icon inline matTooltip="Es una subtarea">subdirectory_arrow_right</mat-icon>
+              }
+              {{ item.title }}
+            </span>
+            <span class="papelera__meta">
+              {{ statusLabels[item.status] }}
+              @if (item.projectName) {
+                · {{ item.projectName }}
+              }
+              · Creada por {{ item.createdByFullName }}
+              @if (item.assignedToFullName) {
+                · Asignada a {{ item.assignedToFullName }}
+              }
+            </span>
+            <span class="papelera__meta papelera__meta--borrado">
+              Borrada por {{ item.deletedByFullName }} el {{ item.deletedAt | date: 'd MMM y, HH:mm' }}
+            </span>
+          </div>
+
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="restaurando().has(item.id)"
+            (click)="restaurar(item)"
+          >
+            @if (restaurando().has(item.id)) {
+              <mat-spinner diameter="16"></mat-spinner>
+            } @else {
+              <mat-icon>restore_from_trash</mat-icon>
+            }
+            Restaurar
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Cerrar</button>
+</mat-dialog-actions>

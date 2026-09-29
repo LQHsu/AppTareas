@@ -19,6 +19,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import {
   TaskService,
   TaskItemDto,
@@ -40,6 +41,7 @@ import { ProyectoArchivosComponent } from '../proyecto-archivos/proyecto-archivo
 import { EditorTextoComponent } from '../../../shared/components/editor-texto/editor-texto.component';
 import { ColorPickerComponent } from '../../../shared/components/color-picker/color-picker.component';
 import { TareaDetalleDialogComponent } from '../../../shared/components/tarea-detalle-dialog/tarea-detalle-dialog.component';
+import { PapeleraDialogComponent } from '../../../shared/components/papelera-dialog/papelera-dialog.component';
 import { RealtimeService } from '../../../core/services/realtime.service';
 
 @Component({
@@ -61,6 +63,7 @@ import { RealtimeService } from '../../../core/services/realtime.service';
     MatTabsModule,
     MatDatepickerModule,
     MatDialogModule,
+    MatTooltipModule,
     TareasTablaComponent,
     ProyectoEstadisticasComponent,
     ProyectoArchivosComponent,
@@ -129,6 +132,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
   });}
 
   private realtimeSub?: Subscription;
+  private realtimeDeleteSub?: Subscription;
   private paramMapSub?: Subscription;
 
   ngOnInit(): void {
@@ -138,6 +142,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     // haga otra persona (crear tarea, cambiar estado, reasignar) sin
     // tener que refrescar. Ver RealtimeService y TaskHub en el backend.
     this.realtimeSub = this.realtime.taskChanged$.subscribe((t) => this.applyRealtimeUpdate(t));
+    this.realtimeDeleteSub = this.realtime.taskDeleted$.subscribe((d) => this.removeTaskLocal(d.id));
 
     // Suscripcion (no snapshot): el selector "Cambiar de proyecto" del
     // header navega a /proyectos/:id con un id distinto, pero sigue
@@ -167,6 +172,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.realtime.leaveProject(this.projectId);
     this.realtimeSub?.unsubscribe();
+    this.realtimeDeleteSub?.unsubscribe();
     this.paramMapSub?.unsubscribe();
   }
 
@@ -455,6 +461,71 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     );
   }
 
+  // Quita una tarea (top-level o subtarea) de la lista local, sin
+  // importar de cual de las dos formas se entero el borrado (respuesta
+  // HTTP propia en onDeleteTask, o evento "TaskDeleted" de otra
+  // persona/pestaña en ngOnInit).
+  private removeTaskLocal(taskId: string): void {
+    this.tasks.update((list) =>
+      list
+        .filter((t) => t.id !== taskId)
+        .map((t) => ({ ...t, subtasks: t.subtasks.filter((s) => s.id !== taskId) }))
+    );
+  }
+
+  // Borrado logico (ver TaskItem.IsDeleted/papelera): al borrar una
+  // tarea con subtareas, el backend las borra en cascada con ella (ver
+  // TasksController.Delete) - alcanza con quitar el id que se borro a
+  // mano aca, el resto de la limpieza (si tenia subtareas) llega por el
+  // evento "TaskDeleted" igual que le llegaria a cualquier otra persona
+  // con este proyecto abierto.
+  onDeleteTask(task: TaskItemDto, onDone?: () => void): void {
+    this.taskService.delete(task.id).subscribe({
+      next: () => {
+        this.removeTaskLocal(task.id);
+        onDone?.();
+      },
+      error: () => {
+        this.errorMessage.set('No se pudo mover la tarea a la papelera.');
+      },
+    });
+  }
+
+  // Papelera de ESTE proyecto (ver TasksController.GetTrash con
+  // projectId) - cualquier miembro/dueno la puede abrir, no solo quien
+  // borro cada tarea.
+  abrirPapelera(): void {
+    const ref = this.dialog.open(PapeleraDialogComponent, {
+      data: { projectId: this.projectId },
+      width: '640px',
+      maxWidth: '95vw',
+      autoFocus: false,
+    });
+
+    ref.componentInstance.restored.subscribe((restored) => {
+      this.tasks.update((list) => {
+        if (list.some((t) => t.id === restored.id || t.subtasks.some((s) => s.id === restored.id))) {
+          return list;
+        }
+
+        // Restaurar una subtarea cuyo padre sigue cargado (no se borro
+        // junto con ella) la vuelve a colgar ahi; si el padre no esta
+        // (se borraron y restauraron juntos, ver Delete/Restore en el
+        // backend) simplemente no aparece hasta el proximo refresh -
+        // caso raro, no vale la pena resolverlo aca.
+        if (restored.parentTaskId) {
+          const tienePadre = list.some((t) => t.id === restored.parentTaskId);
+          if (!tienePadre) return list;
+          return list.map((t) =>
+            t.id === restored.parentTaskId ? { ...t, subtasks: [...t.subtasks, restored] } : t
+          );
+        }
+
+        return [restored, ...list];
+      });
+    });
+  }
+
   // Aplica un TaskChanged que llego por SignalR (ver ngOnInit): a
   // diferencia de replaceTask (que solo actualiza algo que YO acabo de
   // cambiar), esto tiene que cubrir tareas nuevas que otra persona creo
@@ -582,6 +653,15 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
         { title: v.title, description: v.description, fechaLimite: v.fechaLimite },
         refresh
       )
+    );
+    // Cierra el dialog solo si se borro la tarea principal que muestra
+    // (no una subtarea) - borrar una subtarea debe dejar el dialog
+    // abierto viendo al padre, con esa subtarea ya fuera de su lista.
+    instance.deleteTask.subscribe((t) =>
+      this.onDeleteTask(t, () => {
+        if (t.id === task.id) ref.close();
+        else refresh();
+      })
     );
   }
 

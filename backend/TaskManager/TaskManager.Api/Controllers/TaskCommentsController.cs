@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.DTOs;
 using TaskManager.Api.Hubs;
+using TaskManager.Api.Notificaciones;
 using TaskManager.Domain.Entities;
+using TaskManager.Domain.Enums;
 using TaskManager.Infrastructure;
 
 namespace TaskManager.Api.Controllers;
@@ -18,11 +20,13 @@ public class TaskCommentsController : ControllerBase
 
     private readonly AppDbContext _db;
     private readonly IHubContext<TaskHub> _hub;
+    private readonly TaskNotificationService _notifications;
 
-    public TaskCommentsController(AppDbContext db, IHubContext<TaskHub> hub)
+    public TaskCommentsController(AppDbContext db, IHubContext<TaskHub> hub, TaskNotificationService notifications)
     {
         _db = db;
         _hub = hub;
+        _notifications = notifications;
     }
 
     // Mismos grupos que TasksController.NotificarCambio: el grupo del
@@ -77,9 +81,19 @@ public class TaskCommentsController : ControllerBase
     {
         var userId = GetUserIdFromToken();
 
-        var task = await _db.Tasks.Include(t => t.Project).FirstOrDefaultAsync(t => t.Id == taskId);
+        var task = await _db.Tasks
+            .Include(t => t.Project)
+            .ThenInclude(p => p!.Owner)
+            .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
+            .ThenInclude(f => f!.Owner)
+            .Include(t => t.CreatedBy)
+            .Include(t => t.AssignedTo)
+            .FirstOrDefaultAsync(t => t.Id == taskId);
         if (task is null) return NotFound();
         if (!await CanAccessTask(task, userId)) return Forbid();
+        if (task.Status == TaskItemStatus.Pausada)
+            return Conflict("La tarea esta pausada. Reanudala antes de comentar.");
 
         var content = dto.Content?.Trim() ?? string.Empty;
         if (content.Length == 0) return BadRequest("El comentario no puede estar vacio.");
@@ -103,6 +117,12 @@ public class TaskCommentsController : ControllerBase
 
         await NotificarComentario(task, resultDto, "CommentAdded");
 
+        // Correo/Chat: a todos los relacionados con la tarea (creador,
+        // dueno del proyecto, dueno de la oficina y quien la tiene
+        // asignada - deduplicados, ver PersonasRelacionadas), menos quien
+        // acaba de escribir el comentario.
+        await _notifications.NotifyCommentAddedAsync(task, content, userId);
+
         return CreatedAtAction(nameof(GetByTask), new { taskId }, resultDto);
     }
 
@@ -117,6 +137,8 @@ public class TaskCommentsController : ControllerBase
 
         var task = await _db.Tasks.Include(t => t.Project).FirstOrDefaultAsync(t => t.Id == taskId);
         if (task is null) return NotFound();
+        if (task.Status == TaskItemStatus.Pausada)
+            return Conflict("La tarea esta pausada. Reanudala antes de borrar comentarios.");
 
         var comment = await _db.TaskComments.FirstOrDefaultAsync(c => c.Id == commentId && c.TaskId == taskId);
         if (comment is null) return NotFound();
