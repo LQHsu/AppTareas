@@ -63,6 +63,8 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>().Property(u => u.Id).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<User>().Property(u => u.NotifyByEmail).HasDefaultValue(true);
+        modelBuilder.Entity<User>().Property(u => u.NotifyByChat).HasDefaultValue(true);
         modelBuilder.Entity<Project>().Property(p => p.OwnerId).HasMaxLength(UserIdMaxLength);
         modelBuilder.Entity<ProjectFolder>().Property(f => f.OwnerId).HasMaxLength(UserIdMaxLength);
         modelBuilder.Entity<ProjectFolder>().Property(f => f.SharedWithId).HasMaxLength(UserIdMaxLength);
