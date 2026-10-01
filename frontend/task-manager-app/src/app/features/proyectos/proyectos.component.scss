@@ -38,7 +38,7 @@
 .create-form {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 20px;
 }
 
 .create-field {
@@ -313,4 +313,36 @@
 .proyecto-progress-label {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.55);
+}
+.papelera {
+  margin-top: 32px;
+
+  &__lista {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border: 1px solid var(--mat-sys-outline-variant, #ddd);
+    border-radius: 8px;
+  }
+
+  &__nombre {
+    font-weight: 500;
+  }
+
+  &__meta {
+    flex: 1;
+    opacity: 0.7;
+    font-size: 0.875rem;
+  }
 }

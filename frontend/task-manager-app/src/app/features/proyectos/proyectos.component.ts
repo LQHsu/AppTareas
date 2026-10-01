@@ -11,7 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ProjectService, ProjectDto } from '../../core/services/project.service';
+import { ProjectService, ProjectDto, ProjectTrashItemDto } from '../../core/services/project.service';
 import { FolderService, FolderDto } from '../../core/services/folder.service';
 import { AuthService } from '../../core/services/auth.service';
 import { EditorTextoComponent } from '../../shared/components/editor-texto/editor-texto.component';
@@ -87,9 +87,17 @@ export class ProyectosComponent implements OnInit {
     const filtro = this.filtroCarpeta();
     const lista = this.projects();
 
-    if (filtro === 'all') return lista;
-    if (filtro === 'none') return lista.filter((p) => !p.folderId);
-    return lista.filter((p) => p.folderId === filtro);
+    const filtrada =
+      filtro === 'all'
+        ? lista
+        : filtro === 'none'
+          ? lista.filter((p) => !p.folderId)
+          : lista.filter((p) => p.folderId === filtro);
+
+    // Orden alfabetico (sin distinguir acentos ni mayusculas).
+    return [...filtrada].sort((a, b) =>
+      a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+    );
   });
 
   sinCarpetaCount = computed(() => this.projects().filter((p) => !p.folderId).length);
@@ -123,6 +131,53 @@ export class ProyectosComponent implements OnInit {
 
     this.loadProjects();
     this.loadFolders();
+    this.loadTrash();
+  }
+
+  // --- Papelera de proyectos ---
+  // Un proyecto con tareas en su historial no se borra de verdad: va aqui
+  // y se puede restaurar (con sus tareas). Solo se listan los propios.
+  trash = signal<ProjectTrashItemDto[]>([]);
+  showTrash = signal(false);
+
+  loadTrash(): void {
+    this.projectService.getTrash().subscribe({
+      next: (items) => this.trash.set(items),
+      error: () => this.errorMessage.set('No se pudo cargar la papelera de proyectos.'),
+    });
+  }
+
+  onEliminarProyecto(project: ProjectDto, event: Event): void {
+    // La tarjeta entera es un routerLink; sin esto, el click navegaria.
+    event.stopPropagation();
+
+    const ok = window.confirm(
+      `¿Eliminar el proyecto «${project.name}»?\n\n` +
+        'Si ya tuvo tareas, se mueve a la papelera y lo puedes restaurar con todo su contenido. ' +
+        'Si nunca tuvo tareas, se elimina definitivamente.'
+    );
+    if (!ok) return;
+
+    this.projectService.delete(project.id).subscribe({
+      next: (res) => {
+        this.projects.update((list) => list.filter((p) => p.id !== project.id));
+        // Cambian los contadores de proyectos de las oficinas.
+        this.loadFolders();
+        if (!res.permanent) this.loadTrash();
+      },
+      error: () => this.errorMessage.set('No se pudo eliminar el proyecto.'),
+    });
+  }
+
+  onRestaurarProyecto(item: ProjectTrashItemDto): void {
+    this.projectService.restore(item.id).subscribe({
+      next: (restaurado) => {
+        this.trash.update((list) => list.filter((t) => t.id !== item.id));
+        this.projects.update((list) => [...list, restaurado]);
+        this.loadFolders();
+      },
+      error: () => this.errorMessage.set('No se pudo restaurar el proyecto.'),
+    });
   }
 
   loadProjects(): void {
@@ -172,7 +227,7 @@ export class ProyectosComponent implements OnInit {
       })
       .subscribe({
         next: (newProject) => {
-          this.projects.update((list) => [newProject, ...list]);
+          this.projects.update((list) => [...list, newProject]);
           if (folderId) this.loadFolders(); // actualiza el contador de la carpeta
           this.creating.set(false);
           this.showCreateForm.set(false);

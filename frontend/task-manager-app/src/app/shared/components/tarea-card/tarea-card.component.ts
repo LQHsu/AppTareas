@@ -256,6 +256,28 @@ export class TareaCardComponent implements OnInit, OnDestroy {
     this.editando.set(true);
   }
 
+  // Cacheado por valor: un Date nuevo en cada ciclo de deteccion haria
+  // que Angular vea el binding [value] como cambiado cada vez.
+  private fechaLimiteCache: { iso: string | null; fecha: Date | null } | null = null;
+
+  get fechaLimiteActual(): Date | null {
+    const iso = this.task.fechaLimite;
+    if (this.fechaLimiteCache?.iso !== iso) {
+      this.fechaLimiteCache = { iso, fecha: fechaLimiteFromIso(iso) };
+    }
+    return this.fechaLimiteCache.fecha;
+  }
+
+  // La fecha limite se guarda sola al cambiarla (sin entrar a edicion):
+  // reenvia titulo y descripcion actuales por el mismo PATCH /details.
+  onFechaLimiteChange(fecha: Date | null): void {
+    this.detailsChange.emit({
+      title: this.task.title,
+      description: this.task.description,
+      fechaLimite: fechaLimiteToString(fecha),
+    });
+  }
+
   cancelarEdicion(): void {
     this.editando.set(false);
   }

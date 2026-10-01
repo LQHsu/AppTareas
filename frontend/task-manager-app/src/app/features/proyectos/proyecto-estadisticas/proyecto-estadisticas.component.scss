@@ -204,3 +204,55 @@
     min-width: 0;
   }
 }
+
+.lista-rapida {
+  margin-top: 16px;
+  padding: 16px;
+
+  &__items {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: rgba(128, 128, 128, 0.12);
+    }
+  }
+
+  &__titulo {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tag {
+    font-size: 0.75rem;
+    opacity: 0.65;
+  }
+}
+
+.lista-rapida__estado {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}

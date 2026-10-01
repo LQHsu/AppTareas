@@ -167,6 +167,10 @@
                     Quitar de la oficina
                   </button>
                 }
+                <button mat-menu-item (click)="onEliminarProyecto(project, $event)">
+                  <mat-icon>delete_outline</mat-icon>
+                  Eliminar proyecto
+                </button>
               </mat-menu>
             }
           </div>
@@ -205,5 +209,33 @@
         </mat-card>
       }
     </div>
+  }
+
+  <!-- PAPELERA DE PROYECTOS -->
+  @if (trash().length > 0) {
+    <section class="papelera">
+      <button mat-button type="button" (click)="showTrash.set(!showTrash())">
+        <mat-icon>{{ showTrash() ? 'expand_less' : 'delete_outline' }}</mat-icon>
+        Papelera ({{ trash().length }})
+      </button>
+
+      @if (showTrash()) {
+        <ul class="papelera__lista">
+          @for (item of trash(); track item.id) {
+            <li class="papelera__item">
+              <span class="papelera__nombre">{{ item.name }}</span>
+              <span class="papelera__meta">
+                {{ item.totalTasks }} tarea{{ item.totalTasks === 1 ? '' : 's' }} · eliminado el
+                {{ item.deletedAt | date: 'd MMM y' }}
+              </span>
+              <button mat-stroked-button type="button" (click)="onRestaurarProyecto(item)">
+                <mat-icon>restore</mat-icon>
+                Restaurar
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </section>
   }
 </div>

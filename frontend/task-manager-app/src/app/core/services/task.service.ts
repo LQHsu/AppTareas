@@ -132,6 +132,19 @@ export interface TaskDeletedDto {
   projectId: string | null;
 }
 
+// Aviso de asignacion programado (ver ScheduledTaskNotification en el
+// backend). sentAt nulo = pendiente; con valor = ya se envio.
+export interface ScheduledNotificationDto {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  projectId: string | null;
+  projectName: string | null;
+  recipientFullName: string;
+  sendAt: string;
+  sentAt: string | null;
+}
+
 export interface CreateTaskDto {
   title: string;
   description: string | null;
@@ -139,6 +152,19 @@ export interface CreateTaskDto {
   assignedToId: string | null;
   parentTaskId: string | null;
   fechaLimite?: string | null;
+  // ISO en UTC. Si esta en el futuro, el aviso de asignacion se encola y
+  // sale a esa hora; nulo = aviso inmediato (ver notificarEnToIso).
+  notificarEn?: string | null;
+}
+
+// Del valor de un <input type="datetime-local"> ("yyyy-MM-ddTHH:mm", hora
+// LOCAL de quien lo elige, sin zona) al ISO en UTC que espera el backend
+// (NotificarEn). new Date(string) sin zona lo interpreta como local, y
+// toISOString() lo pasa a UTC - asi "9:00" en Mexico llega como 15:00Z.
+export function notificarEnToIso(local: string | null | undefined): string | null {
+  if (!local) return null;
+  const fecha = new Date(local);
+  return isNaN(fecha.getTime()) ? null : fecha.toISOString();
 }
 
 @Injectable({ providedIn: 'root' })
@@ -149,6 +175,22 @@ export class TaskService {
 
   getByProject(projectId: string): Observable<TaskItemDto[]> {
     return this.http.get<TaskItemDto[]>(`${this.baseUrl}?projectId=${projectId}`);
+  }
+
+  // Resumen de Inicio: tareas visibles para mi modificadas en [from, to).
+  getModified(from: Date, to: Date): Observable<TaskItemDto[]> {
+    return this.http.get<TaskItemDto[]>(`${this.baseUrl}/modified`, {
+      params: { from: from.toISOString(), to: to.toISOString() },
+    });
+  }
+
+  // Avisos de asignacion programados por mi (pendientes y enviados).
+  // from/to opcionales: filtran por la hora programada.
+  getScheduledNotifications(from?: Date | null, to?: Date | null): Observable<ScheduledNotificationDto[]> {
+    const params: Record<string, string> = {};
+    if (from) params['from'] = from.toISOString();
+    if (to) params['to'] = to.toISOString();
+    return this.http.get<ScheduledNotificationDto[]>(`${this.baseUrl}/scheduled-notifications`, { params });
   }
 
   getMine(): Observable<TaskItemDto[]> {
@@ -170,8 +212,15 @@ export class TaskService {
     return this.http.patch<TaskItemDto>(`${this.baseUrl}/${taskId}/read`, {});
   }
 
-  updateAssignee(taskId: string, assignedToId: string | null): Observable<TaskItemDto> {
-    return this.http.patch<TaskItemDto>(`${this.baseUrl}/${taskId}/assign`, { assignedToId });
+  updateAssignee(
+    taskId: string,
+    assignedToId: string | null,
+    notificarEn: string | null = null
+  ): Observable<TaskItemDto> {
+    return this.http.patch<TaskItemDto>(`${this.baseUrl}/${taskId}/assign`, {
+      assignedToId,
+      notificarEn,
+    });
   }
 
   // description viene como HTML (lo produce app-editor-texto). fechaLimite

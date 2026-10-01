@@ -28,6 +28,15 @@ public class Project
 
     public bool IsArchived { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // Borrado logico (papelera de proyectos, ver ProjectsController.Delete/
+    // Restore). Solo se usa si el proyecto ya tuvo alguna tarea (incluidas
+    // las de la papelera): uno que nunca tuvo tareas se borra de verdad.
+    // Filtrado por un HasQueryFilter global en AppDbContext, que ademas
+    // oculta las tareas del proyecto - se recuperan al restaurarlo. Solo
+    // el dueno puede borrar, asi que no hace falta guardar quien fue.
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
  
     public ICollection<ProjectMember> Members { get; set; } = new List<ProjectMember>();
     public ICollection<TaskItem> Tasks { get; set; } = new List<TaskItem>();

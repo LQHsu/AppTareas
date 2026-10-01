@@ -1,0 +1,27 @@
+:host {
+  display: block;
+}
+
+.fh {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  &__fecha {
+    flex: 1 1 220px;
+    cursor: pointer;
+  }
+
+  &__hora {
+    flex: 0 0 130px;
+  }
+}
+
+.fh__aviso {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  color: #b45309;
+}

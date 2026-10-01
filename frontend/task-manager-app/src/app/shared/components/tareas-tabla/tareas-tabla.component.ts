@@ -3,14 +3,18 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   OnChanges,
   OnDestroy,
   Output,
   SimpleChanges,
   ViewChild,
+  computed,
   inject,
+  signal,
 } from '@angular/core';
+import { TaskAttachmentService } from '../../../core/services/task-attachment.service';
 import { MatIconModule } from '@angular/material/icon';
 import { TabulatorFull as Tabulator, CellComponent, ColumnDefinition } from 'tabulator-tables';
 import { TaskItemDto, TaskItemStatus, TASK_STATUS_LABELS } from '../../../core/services/task.service';
@@ -75,7 +79,86 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
     this.tabulator?.refreshFilter();
   }
 
+  // --- Filtro multiple de estados ---
+  // Reemplaza al headerFilter 'list' de la columna Estado, que solo deja
+  // elegir un valor. Vacio = sin filtro (se muestran todos).
+  opcionesEstado = (Object.keys(TASK_STATUS_LABELS) as string[]).map((k) => ({
+    value: Number(k) as TaskItemStatus,
+    label: TASK_STATUS_LABELS[Number(k) as TaskItemStatus],
+  }));
+  estadosSeleccionados = signal<Set<TaskItemStatus>>(new Set());
+  filtroEstadosAbierto = signal(false);
+  panelPos = signal({ top: 0, left: 0 });
+
+  etiquetaFiltroEstados = computed(() => {
+    const n = this.estadosSeleccionados().size;
+    return n === 0 ? 'Estados: todos' : n === 1 ? '1 estado' : `${n} estados`;
+  });
+
+  toggleFiltroEstados(event: MouseEvent): void {
+    event.stopPropagation();
+    if (!this.filtroEstadosAbierto()) {
+      const r = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      this.panelPos.set({ top: r.bottom + 6, left: r.left });
+    }
+    this.filtroEstadosAbierto.update((v) => !v);
+  }
+
+  @HostListener('document:click')
+  cerrarFiltroEstados(): void {
+    this.filtroEstadosAbierto.set(false);
+  }
+
+  toggleEstado(status: TaskItemStatus): void {
+    this.estadosSeleccionados.update((s) => {
+      const nuevo = new Set(s);
+      if (!nuevo.delete(status)) nuevo.add(status);
+      return nuevo;
+    });
+    this.tabulator?.refreshFilter();
+  }
+
+  limpiarEstados(): void {
+    this.estadosSeleccionados.set(new Set());
+    this.tabulator?.refreshFilter();
+  }
+
+  // --- Adjuntar archivo desde la fila ---
+  @ViewChild('inputArchivo', { static: true }) inputArchivo!: ElementRef<HTMLInputElement>;
+  errorAdjunto = signal<string | null>(null);
+  private attachmentService = inject(TaskAttachmentService);
+  private tareaParaAdjuntar: { task: TaskItemDto; cell: CellComponent } | null = null;
+
+  private abrirSelectorArchivo(task: TaskItemDto, cell: CellComponent): void {
+    this.tareaParaAdjuntar = { task, cell };
+    this.inputArchivo.nativeElement.click();
+  }
+
+  onArchivoElegido(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const destino = this.tareaParaAdjuntar;
+    input.value = '';
+    this.tareaParaAdjuntar = null;
+    if (!file || !destino) return;
+
+    this.attachmentService.upload(destino.task.id, file).subscribe({
+      next: () => {
+        const row = destino.cell.getRow();
+        const actual = (row.getData() as TaskItemDto).attachmentCount ?? 0;
+        row.update({ attachmentCount: actual + 1 });
+        destino.task.attachmentCount = actual + 1;
+      },
+      error: () => {
+        this.errorAdjunto.set('No se pudo subir el archivo (revisa tamaño y tipo permitido).');
+        setTimeout(() => this.errorAdjunto.set(null), 5000);
+      },
+    });
+  }
+
   private coincideBusqueda = (data: FilaTarea): boolean => {
+    const estados = this.estadosSeleccionados();
+    if (estados.size > 0 && !estados.has(data.status)) return false;
     if (!this.terminoBusqueda) return true;
     const campos = [
       data.title,
@@ -127,6 +210,7 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
   }
 
   ngOnDestroy(): void {
+    this.cerrarFechasPopup();
     this.tabulator?.destroy();
   }
 
@@ -142,11 +226,6 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
   }
 
   private initTabla(): void {
-    const statusOptions: Record<string, string> = {};
-    Object.entries(TASK_STATUS_LABELS).forEach(([value, label]) => {
-      statusOptions[value] = label;
-    });
-
     const columns: ColumnDefinition[] = [
       {
         // Sin encabezado visible (solo tooltip): con dos iconos de ~20px
@@ -163,6 +242,20 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
         formatter: (cell: CellComponent) =>
           this.formatIndicadores(cell.getRow().getData() as TaskItemDto),
         cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
+      },
+      {
+        title: '',
+        headerTooltip: 'Adjuntar archivo',
+        headerSort: false,
+        width: 50,
+        hozAlign: 'center',
+        // Misma clase que el icono de fechas: mismo estilo apagado/hover.
+        formatter: () =>
+          '<span class="material-icons fecha-celda__icono" title="Adjuntar archivo">upload_file</span>',
+        cellClick: (e: UIEvent, cell: CellComponent) => {
+          e.stopPropagation();
+          this.abrirSelectorArchivo(cell.getRow().getData() as TaskItemDto, cell);
+        },
       },
       {
         title: 'Tarea',
@@ -226,8 +319,7 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
       {
         title: 'Estado',
         field: 'status',
-        headerFilter: 'list',
-        headerFilterParams: { values: { '': 'Todos', ...statusOptions } },
+        // (El filtro por estado es el multiselect de la barra superior.)
         // Pill de color en vez de texto plano: mismo lenguaje visual que
         // el resto de la app (paleta azul/verde/rojo), en progresion de
         // "sin empezar" (neutro) -> "en curso" (azul) -> "atencion" o
@@ -268,16 +360,21 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
         cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
       },
       {
-        title: 'Creada',
+        // Antes eran dos columnas ("Creada" / "Último cambio de estado")
+        // que ocupaban espacio para un dato que casi nunca hace falta ver
+        // de un vistazo. Se comprimen en un solo icono que abre un popup
+        // con ambas fechas al hacer click (ver toggleFechasPopup) - el
+        // orden inicial de la tabla sigue siendo por fecha de creacion
+        // (initialSort abajo), eso no cambia.
+        title: '',
+        headerTooltip: 'Fechas (creada / último cambio de estado)',
+        width: 60,
+        hozAlign: 'center',
         field: 'createdAt',
-        formatter: (cell: CellComponent) => this.formatFecha(cell.getValue()),
+        formatter: () => '<span class="material-icons fecha-celda__icono">event</span>',
         sorter: this.sorterFecha,
-      },
-      {
-        title: 'Último cambio de estado',
-        field: 'lastStatusChangeAt',
-        formatter: (cell: CellComponent) => this.formatFecha(cell.getValue()),
-        sorter: this.sorterFecha,
+        cellClick: (e: UIEvent, cell: CellComponent) =>
+          this.toggleFechasPopup(e as MouseEvent, cell, cell.getRow().getData() as TaskItemDto),
       },
     ];
 
@@ -350,6 +447,68 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+
+  // Popup con "Creada" / "Último cambio de estado" que abre el icono de
+  // calendario (ver la columna sin titulo en initTabla). Se arma a mano
+  // con DOM plano en vez de un overlay de Angular Material porque
+  // Tabulator ya renderiza fuera del arbol de componentes - CDK Overlay
+  // esperaria un ViewContainerRef que la celda no tiene. Un solo popup a
+  // la vez: un segundo click en (el mismo u otro) icono cierra el que
+  // estuviera abierto antes de decidir si abre uno nuevo.
+  private popupFechas: HTMLDivElement | null = null;
+  private cerrarPopupFechasListener: ((ev: MouseEvent) => void) | null = null;
+
+  private toggleFechasPopup(event: MouseEvent, cell: CellComponent, task: TaskItemDto): void {
+    event.stopPropagation();
+    const yaAbierto = this.popupFechas !== null;
+    this.cerrarFechasPopup();
+    if (yaAbierto) return;
+
+    const popup = document.createElement('div');
+    popup.className = 'fechas-popup';
+    popup.innerHTML = `
+      <div class="fechas-popup__fila">
+        <span class="fechas-popup__etiqueta">Creada</span>
+        <span>${this.formatFecha(task.createdAt)}</span>
+      </div>
+      <div class="fechas-popup__fila">
+        <span class="fechas-popup__etiqueta">Último cambio de estado</span>
+        <span>${this.formatFecha(task.lastStatusChangeAt)}</span>
+      </div>
+    `;
+    document.body.appendChild(popup);
+
+    const anclaRect = cell.getElement().getBoundingClientRect();
+    const popupRect = popup.getBoundingClientRect();
+    const left = Math.max(8, anclaRect.right - popupRect.width);
+    popup.style.left = `${left + window.scrollX}px`;
+    popup.style.top = `${anclaRect.bottom + window.scrollY + 6}px`;
+
+    this.popupFechas = popup;
+
+    // setTimeout: sin esto, el mismo click que abre el popup llega al
+    // listener de document y lo cierra de inmediato (el evento sigue
+    // burbujeando cuando este metodo corre, pese al stopPropagation de
+    // arriba - ese solo frena el cellClick/rowClick de Tabulator, no un
+    // listener nuevo agregado a document en el mismo ciclo).
+    setTimeout(() => {
+      this.cerrarPopupFechasListener = (ev: MouseEvent) => {
+        if (this.popupFechas && !this.popupFechas.contains(ev.target as Node)) {
+          this.cerrarFechasPopup();
+        }
+      };
+      document.addEventListener('click', this.cerrarPopupFechasListener);
+    });
+  }
+
+  private cerrarFechasPopup(): void {
+    if (this.cerrarPopupFechasListener) {
+      document.removeEventListener('click', this.cerrarPopupFechasListener);
+      this.cerrarPopupFechasListener = null;
+    }
+    this.popupFechas?.remove();
+    this.popupFechas = null;
   }
 
   // A diferencia de formatFecha (un timestamp real), fechaLimite es solo

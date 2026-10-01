@@ -26,8 +26,82 @@
 // Ocupa todo el ancho de la tabla, pero el input en si es una caja
 // blanca angosta (30%, redondeada) pegada a la izquierda — no un campo
 // que estira de borde a borde.
+.filtro-estados__boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--app-blue-strong);
+  }
+
+  // Con estados elegidos, el borde azul avisa que la tabla esta filtrada.
+  &--activo {
+    border-color: var(--app-blue-strong);
+    color: var(--app-blue-strong);
+    font-weight: 600;
+  }
+}
+
+// Mismo lenguaje que .fechas-popup (fondo, borde, sombra).
+.filtro-estados__panel {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  font-size: 12.5px;
+}
+
+.filtro-estados__opcion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--app-blue-soft);
+  }
+
+  input {
+    accent-color: var(--app-blue);
+  }
+}
+
+.filtro-estados__limpiar {
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: none;
+  border-top: 1px solid var(--app-border);
+  background: transparent;
+  color: var(--app-blue-strong);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
 .tareas-tabla-buscador {
   display: flex;
+  align-items: center;
   padding: 14px 16px;
   background: var(--app-blue);
 }
@@ -405,4 +479,65 @@
   background: var(--estado-pausada-soft);
   border-color: var(--estado-pausada);
   color: var(--estado-pausada);
+}
+
+// Icono de la columna "Fechas" (ver toggleFechasPopup en el .ts): mismo
+// tono apagado que los indicadores de adjuntos/comentarios, se resalta
+// en azul al pasar el mouse para dejar claro que es clicable.
+::ng-deep .fecha-celda__icono {
+  font-size: 20px;
+  color: var(--app-text-subtle);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--app-blue-strong);
+  }
+}
+
+// Popup de fechas: se cuelga de document.body via document.createElement
+// (no del host del componente) - por eso lleva ::ng-deep igual que el
+// resto del archivo: la encapsulacion emulada de Angular le agrega a
+// cada elemento del template un atributo de scope (_ngcontent-xxx) y
+// reescribe los selectores para exigirlo. Un nodo armado a mano con
+// createElement/appendChild NUNCA tiene ese atributo, sin importar en
+// que parte del DOM quede colgado - sin ::ng-deep, .fechas-popup no
+// matcheaba nada y el popup se insertaba sin ningun estilo (sin
+// position/fondo/z-index), practicamente invisible al fondo de la
+// pagina. Mismo motivo por el que badge-estado/indicadores/etc de
+// arriba lo usan.
+::ng-deep .fechas-popup {
+  position: absolute;
+  z-index: 1000;
+  min-width: 220px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  font-size: 12.5px;
+}
+
+::ng-deep .fechas-popup__fila {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+
+  & + & {
+    border-top: 1px solid var(--app-border);
+  }
+}
+
+::ng-deep .fechas-popup__etiqueta {
+  color: var(--app-text-subtle);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tareas-tabla-error {
+  padding: 10px 16px;
+  background: var(--app-red-soft);
+  color: var(--app-red-strong);
+  font-size: 12.5px;
 }

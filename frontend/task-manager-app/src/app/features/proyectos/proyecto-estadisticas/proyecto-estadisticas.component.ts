@@ -1,10 +1,12 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatButtonModule } from '@angular/material/button';
 import { TaskItemDto, TaskItemStatus, TASK_STATUS_LABELS } from '../../../core/services/task.service';
 import { ProjectMemberDto } from '../../../core/services/project-member.service';
 
@@ -18,7 +20,7 @@ type FiltroUsuario = 'all' | null | string;
 // grafico tenia su propia paleta separada (azul/verde/magenta + colores
 // sueltos) y un mismo estado se veia con un color en el badge y otro en
 // la dona — con esto un estado significa el mismo color en toda la app.
-const STATUS_COLORS: Record<TaskItemStatus, string> = {
+export const STATUS_COLORS: Record<TaskItemStatus, string> = {
   [TaskItemStatus.Creada]: 'var(--estado-creada)',
   [TaskItemStatus.Asignada]: 'var(--estado-asignada)',
   [TaskItemStatus.Leida]: 'var(--estado-leida)',
@@ -56,6 +58,8 @@ export interface DonutSegment {
     MatFormFieldModule,
     MatSelectModule,
     MatProgressBarModule,
+    MatDatepickerModule,
+    MatButtonModule,
   ],
   templateUrl: './proyecto-estadisticas.component.html',
   styleUrl: './proyecto-estadisticas.component.scss',
@@ -68,6 +72,13 @@ export class ProyectoEstadisticasComponent {
   members = input.required<ProjectMemberDto[]>();
 
   filtroUsuario = signal<FiltroUsuario>('all');
+  fechaDesde = signal<Date | null>(null);
+  fechaHasta = signal<Date | null>(null);
+
+  limpiarFechas(): void {
+    this.fechaDesde.set(null);
+    this.fechaHasta.set(null);
+  }
 
   // Las subtareas tambien cuentan: vienen anidadas dentro de cada tarea
   // top-level (ver TaskItemDto.subtasks), asi que hay que aplanarlas.
@@ -75,9 +86,47 @@ export class ProyectoEstadisticasComponent {
 
   filteredTasks = computed(() => {
     const filtro = this.filtroUsuario();
-    if (filtro === 'all') return this.allTasks();
-    return this.allTasks().filter((t) => t.assignedToId === filtro);
+    const desde = this.fechaDesde();
+    const hasta = this.fechaHasta();
+
+    // Limites del rango en hora LOCAL. mat-datepicker entrega un Date a
+    // medianoche local, asi que:
+    // - desde ya es el inicio del dia, se usa tal cual.
+    // - hasta se mueve a las 23:59:59.999 de ese dia; si se comparara
+    //   contra la medianoche, las tareas con cambio de estado durante el
+    //   dia final quedarian fuera aunque el rango las incluya.
+    const inicio = desde ? desde.getTime() : null;
+    const fin = hasta
+      ? new Date(hasta.getFullYear(), hasta.getMonth(), hasta.getDate(), 23, 59, 59, 999).getTime()
+      : null;
+
+    return this.allTasks().filter((t) => {
+      // 1) Persona asignada (misma logica de antes).
+      if (filtro !== 'all' && t.assignedToId !== filtro) return false;
+
+      // 2) Rango de fechas por ultimo cambio de estado. Sin ninguna de
+      //    las dos fechas no se filtra nada.
+      if (inicio === null && fin === null) return true;
+
+      // lastStatusChangeAt llega como ISO en UTC; Date.getTime() lo
+      // convierte a un instante absoluto, comparable directo contra los
+      // limites locales sin ajustes de zona horaria.
+      const cambio = new Date(t.lastStatusChangeAt).getTime();
+      if (inicio !== null && cambio < inicio) return false;
+      if (fin !== null && cambio > fin) return false;
+      return true;
+    });
   });
+
+  // Lista rapida de tareas: solo aparece con algun filtro activo (persona
+  // o rango de fechas). Sin filtro serian todas las del proyecto y para
+  // eso ya esta la pestana de tareas.
+  hayFiltro = computed(
+    () => this.filtroUsuario() !== 'all' || !!this.fechaDesde() || !!this.fechaHasta()
+  );
+
+  // El padre abre el modal de detalle (ver ProyectoDetalleComponent).
+  taskClick = output<TaskItemDto>();
 
   total = computed(() => this.filteredTasks().length);
 
@@ -125,6 +174,15 @@ export class ProyectoEstadisticasComponent {
       })
       .filter((s) => s.count > 0);
   });
+
+  // Mismo color/etiqueta del estado que usa la dona, para la lista rapida.
+  statusColor(status: TaskItemStatus): string {
+    return STATUS_COLORS[status];
+  }
+
+  statusLabel(status: TaskItemStatus): string {
+    return TASK_STATUS_LABELS[status];
+  }
 
   // Redondeado solo para mostrar en la leyenda (el del donut usa el
   // valor exacto para que los segmentos cierren bien).

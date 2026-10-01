@@ -1,0 +1,446 @@
+@use '@angular/material' as mat;
+
+:host {
+  display: block;
+  // Mismo criterio que estadisticas/tarea-card: el outline por defecto
+  // queda desproporcionado frente al resto del texto.
+  @include mat.form-field-density(-3);
+}
+
+.home {
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+@media (min-width: 600px) {
+  .home {
+    max-width: 80vw;
+  }
+}
+
+.home__header {
+  margin-bottom: 24px;
+
+  h1 {
+    margin: 0;
+    font-size: 22px;
+  }
+}
+
+.home__fecha {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--app-text-muted);
+  text-transform: capitalize;
+}
+
+/* ---------- Accesos rapidos ---------- */
+
+.accesos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.acceso {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 20px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--app-blue);
+    box-shadow: 0 4px 14px rgba(65, 105, 225, 0.14);
+    transform: translateY(-2px);
+  }
+}
+
+.acceso__icono {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--app-blue-soft);
+  color: var(--app-blue-strong);
+
+  mat-icon {
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.acceso__texto {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.acceso__titulo {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.acceso__detalle {
+  font-size: 12.5px;
+  color: var(--app-text-muted);
+}
+
+.acceso__flecha {
+  flex: none;
+  color: var(--app-text-subtle);
+  transition: transform 0.15s, color 0.15s;
+}
+
+.acceso:hover .acceso__flecha {
+  color: var(--app-blue);
+  transform: translateX(3px);
+}
+
+/* ---------- Pestanas / panel ---------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 20px;
+}
+
+.panel__filtro {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.campo-fecha {
+  width: 200px;
+}
+
+.campo-rango {
+  width: 280px;
+}
+
+.cargando {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+.error {
+  margin: 0;
+  color: var(--app-red);
+  font-size: 13px;
+}
+
+.vacio {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--app-text-subtle);
+}
+
+/* ---------- Tarjetas de resumen (mismo estilo que estadisticas) ---------- */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--app-border);
+  box-shadow: none;
+}
+
+.stat-card--destacada {
+  border-color: var(--app-blue);
+  background: var(--app-blue-soft);
+
+  .stat-card__valor {
+    color: var(--app-blue-strong);
+  }
+}
+
+.stat-card__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+.stat-card__valor {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--app-text);
+}
+
+.stat-card__valor--ok {
+  color: var(--app-green);
+}
+
+.stat-card__nota {
+  font-size: 12px;
+  color: var(--app-text-muted);
+}
+
+/* ---------- Bloques ---------- */
+
+.dos-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.bloque {
+  padding: 18px;
+  border: 1px solid var(--app-border);
+  box-shadow: none;
+}
+
+.bloque__titulo {
+  margin: 0 0 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+.grafico__cuerpo {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.donut {
+  flex: none;
+  width: 170px;
+  height: 170px;
+}
+
+.donut__pista {
+  stroke: var(--app-surface-subtle);
+}
+
+.donut__num {
+  font-size: 7px;
+  font-weight: 600;
+  fill: var(--app-text);
+}
+
+.donut__lbl {
+  font-size: 2.8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--app-text-subtle);
+}
+
+.leyenda {
+  flex: 1;
+  min-width: 180px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.leyenda__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+
+  &:hover {
+    background: var(--app-surface-subtle);
+  }
+}
+
+.leyenda__label {
+  flex: 1;
+  font-size: 13px;
+}
+
+.leyenda__count {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.leyenda__pct {
+  width: 42px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--app-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.punto {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* ---------- Listas ---------- */
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.lista__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--app-surface-subtle);
+  }
+}
+
+.lista__texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lista__titulo {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lista__sub {
+  font-size: 12px;
+  color: var(--app-text-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lista__fecha {
+  flex: none;
+  font-size: 12px;
+  color: var(--app-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Avisos ---------- */
+
+.aviso__icono {
+  flex: none;
+  color: #b45309;
+
+  &--ok {
+    color: var(--app-green);
+  }
+}
+
+.badge {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+
+  &--ok {
+    background: var(--app-green-soft);
+    color: var(--app-green-strong);
+  }
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 999px;
+  background: var(--app-surface);
+  color: var(--app-text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+
+  &--activo {
+    border-color: var(--app-blue);
+    background: var(--app-blue-soft);
+    color: var(--app-blue-strong);
+    font-weight: 600;
+  }
+}
+
+.chip__count {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+/* ---------- Movil ---------- */
+
+@media (max-width: 600px) {
+  .campo-fecha,
+  .campo-rango {
+    width: 100%;
+  }
+
+  .chips {
+    margin-left: 0;
+  }
+
+  .lista__fecha {
+    display: none;
+  }
+
+  .grafico__cuerpo {
+    flex-direction: column;
+    gap: 18px;
+  }
+}

@@ -46,7 +46,7 @@
 .create-form {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 20px;
 }
 
 .create-field {
@@ -57,6 +57,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: 4px;
 }
 
 .mis-tareas-error {

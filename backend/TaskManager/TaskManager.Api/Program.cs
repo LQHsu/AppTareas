@@ -160,6 +160,10 @@ builder.Services.AddSingleton<GoogleChatClient>();
 // TaskCommentsController.
 builder.Services.AddSingleton<TaskNotificationService>();
 
+// Manda los avisos de asignacion programados a una hora futura (ver
+// ScheduledNotificationWorker). Asume una sola instancia del servidor.
+builder.Services.AddHostedService<ScheduledNotificationWorker>();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

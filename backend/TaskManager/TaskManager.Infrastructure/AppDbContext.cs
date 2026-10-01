@@ -49,7 +49,8 @@ public class AppDbContext : DbContext
     public DbSet<TaskStatusHistory> TaskStatusHistories => Set<TaskStatusHistory>();
     public DbSet<ProjectFolder> ProjectFolders => Set<ProjectFolder>();
     public DbSet<AltaCoordinador> AltasCoordinador => Set<AltaCoordinador>();
- 
+    public DbSet<ScheduledTaskNotification> ScheduledTaskNotifications => Set<ScheduledTaskNotification>();
+
     // "sub" de Keycloak: para un usuario federado (ver
     // CusxacdiUserStorageProvider en docker/keycloak/) es un string
     // compuesto tipo "f:<uuid>:<matricula>", nunca un Guid. 128 alcanza
@@ -76,7 +77,13 @@ public class AppDbContext : DbContext
         // ninguna consulta normal (GetByProject, GetMine, subtareas, etc.)
         // vuelve a ver una tarea borrada sin pedirlo explicitamente. La
         // papelera usa _db.Tasks.IgnoreQueryFilters() a proposito.
-        modelBuilder.Entity<TaskItem>().HasQueryFilter(t => !t.IsDeleted);
+        //
+        // Tambien se ocultan las tareas de un proyecto borrado (ver
+        // Project.IsDeleted): sin esto, Mis tareas las seguiria mostrando
+        // con Project nulo. ProjectId nulo = tarea suelta, no aplica.
+        modelBuilder.Entity<TaskItem>().HasQueryFilter(t =>
+            !t.IsDeleted && (t.ProjectId == null || !t.Project!.IsDeleted));
+        modelBuilder.Entity<Project>().HasQueryFilter(p => !p.IsDeleted);
         modelBuilder.Entity<TaskStatusHistory>().Property(h => h.ChangedById).HasMaxLength(UserIdMaxLength);
         modelBuilder.Entity<AltaCoordinador>().Property(a => a.CreatedById).HasMaxLength(UserIdMaxLength);
         modelBuilder.Entity<AltaCoordinador>().Property(a => a.UserId).HasMaxLength(UserIdMaxLength);
@@ -220,5 +227,16 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<TaskItem>().HasIndex(t => t.AssignedToId);
         modelBuilder.Entity<TaskItem>().HasIndex(t => t.AreaId);
         modelBuilder.Entity<TaskItem>().HasIndex(t => t.Status);
+
+        // Cola de avisos programados. El worker consulta cada minuto por
+        // (SentAt nulo, SendAt vencido), de ahi el indice compuesto.
+        modelBuilder.Entity<ScheduledTaskNotification>().Property(n => n.RecipientId).HasMaxLength(UserIdMaxLength);
+        modelBuilder.Entity<ScheduledTaskNotification>().HasIndex(n => new { n.SentAt, n.SendAt });
+        modelBuilder.Entity<ScheduledTaskNotification>().HasIndex(n => n.TaskId);
+        modelBuilder.Entity<ScheduledTaskNotification>()
+            .HasOne(n => n.Task)
+            .WithMany()
+            .HasForeignKey(n => n.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

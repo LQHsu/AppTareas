@@ -1,0 +1,230 @@
+<div class="home">
+  <header class="home__header">
+    <h1>Hola{{ nombre() ? ', ' + nombre() : '' }}</h1>
+    <p class="home__fecha">{{ fechaHoy }}</p>
+  </header>
+
+  <!-- ACCESOS RAPIDOS -->
+  <nav class="accesos" aria-label="Accesos rápidos">
+    @for (a of accesos; track a.ruta) {
+      <a class="acceso" [routerLink]="a.ruta">
+        <span class="acceso__icono"><mat-icon>{{ a.icono }}</mat-icon></span>
+        <span class="acceso__texto">
+          <span class="acceso__titulo">{{ a.titulo }}</span>
+          <span class="acceso__detalle">{{ a.detalle }}</span>
+        </span>
+        <mat-icon class="acceso__flecha">arrow_forward</mat-icon>
+      </a>
+    }
+  </nav>
+
+  <mat-tab-group class="home__tabs" animationDuration="0ms">
+    <!-- ACTIVIDAD DEL DIA -->
+    <mat-tab label="Actividad del día">
+      <div class="panel">
+        <div class="panel__filtro">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo-fecha">
+            <mat-label>Día</mat-label>
+            <input
+              matInput
+              readonly
+              [matDatepicker]="diaPicker"
+              [max]="hoy"
+              [value]="dia()"
+              (dateChange)="cambiarDia($event.value)"
+              (click)="diaPicker.open()"
+            />
+            <mat-datepicker-toggle matIconSuffix [for]="diaPicker"></mat-datepicker-toggle>
+            <mat-datepicker #diaPicker></mat-datepicker>
+          </mat-form-field>
+          @if (!esHoy()) {
+            <button mat-button type="button" (click)="irAHoy()">Ir a hoy</button>
+          }
+        </div>
+
+        @if (errorTareas()) {
+          <p class="error">{{ errorTareas() }}</p>
+        }
+
+        @if (cargandoTareas()) {
+          <div class="cargando"><mat-spinner diameter="28"></mat-spinner></div>
+        } @else {
+          <div class="cards">
+            <mat-card class="stat-card stat-card--destacada">
+              <span class="stat-card__label">Tareas modificadas</span>
+              <span class="stat-card__valor">{{ total() }}</span>
+              <span class="stat-card__nota">Incluye subtareas</span>
+            </mat-card>
+            <mat-card class="stat-card">
+              <span class="stat-card__label">Terminadas</span>
+              <span class="stat-card__valor stat-card__valor--ok">{{ terminadas() }}</span>
+              <span class="stat-card__nota">En el estado actual</span>
+            </mat-card>
+            <mat-card class="stat-card">
+              <span class="stat-card__label">En curso</span>
+              <span class="stat-card__valor">{{ enCurso() }}</span>
+              <span class="stat-card__nota">Sin terminar ni cancelar</span>
+            </mat-card>
+          </div>
+
+          @if (total() === 0) {
+            <mat-card class="bloque">
+              <p class="vacio">
+                {{ esHoy() ? 'Aún no hay tareas modificadas hoy.' : 'No hubo tareas modificadas ese día.' }}
+              </p>
+            </mat-card>
+          } @else {
+            <div class="dos-cols">
+              <mat-card class="bloque">
+                <h3 class="bloque__titulo">Tareas por estado</h3>
+                <div class="grafico__cuerpo">
+                  <svg class="donut" viewBox="0 0 42 42" role="img" aria-label="Distribución por estado">
+                    <g transform="rotate(-90 21 21)">
+                      <circle class="donut__pista" cx="21" cy="21" r="15.9155" fill="none" stroke-width="4.5" />
+                      @for (s of segments(); track s.status) {
+                        <circle
+                          cx="21"
+                          cy="21"
+                          r="15.9155"
+                          fill="none"
+                          stroke-width="4.5"
+                          [attr.stroke]="s.color"
+                          [attr.stroke-dasharray]="s.dashArray"
+                          [attr.stroke-dashoffset]="s.dashOffset"
+                        >
+                          <title>{{ s.label }}: {{ s.count }}</title>
+                        </circle>
+                      }
+                    </g>
+                    <text class="donut__num" x="21" y="20.5" text-anchor="middle">{{ total() }}</text>
+                    <text class="donut__lbl" x="21" y="25" text-anchor="middle">
+                      {{ total() === 1 ? 'tarea' : 'tareas' }}
+                    </text>
+                  </svg>
+
+                  <ul class="leyenda">
+                    @for (s of segments(); track s.status) {
+                      <li class="leyenda__item">
+                        <span class="punto" [style.background]="s.color"></span>
+                        <span class="leyenda__label">{{ s.label }}</span>
+                        <span class="leyenda__count">{{ s.count }}</span>
+                        <span class="leyenda__pct">{{ percentLabel(s) }}%</span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              </mat-card>
+
+              <mat-card class="bloque">
+                <h3 class="bloque__titulo">Tareas ({{ total() }})</h3>
+                <ul class="lista">
+                  @for (t of tareas(); track t.id) {
+                    <li>
+                      <button type="button" class="lista__item" (click)="abrirTarea(t.id, t.projectId, t.parentTaskId)">
+                        <span
+                          class="punto"
+                          [style.background]="statusColor(t.status)"
+                          [attr.title]="statusLabels[t.status]"
+                        ></span>
+                        <span class="lista__texto">
+                          <span class="lista__titulo">{{ t.title }}</span>
+                          <span class="lista__sub">
+                            {{ t.projectName ?? 'Tarea suelta' }}
+                            @if (t.parentTaskId) { · subtarea }
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </mat-card>
+            </div>
+          }
+        }
+      </div>
+    </mat-tab>
+
+    <!-- AVISOS PROGRAMADOS -->
+    <mat-tab label="Avisos programados">
+      <div class="panel">
+        <div class="panel__filtro">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="campo-rango">
+            <mat-label>Fecha programada</mat-label>
+            <mat-date-range-input [rangePicker]="rangoPicker">
+              <input
+                matStartDate
+                readonly
+                placeholder="Desde"
+                [value]="desde()"
+                (dateChange)="desde.set($event.value); cambiarRango()"
+              />
+              <input
+                matEndDate
+                readonly
+                placeholder="Hasta"
+                [value]="hasta()"
+                (dateChange)="hasta.set($event.value); cambiarRango()"
+              />
+            </mat-date-range-input>
+            <mat-datepicker-toggle matIconSuffix [for]="rangoPicker"></mat-datepicker-toggle>
+            <mat-date-range-picker #rangoPicker></mat-date-range-picker>
+          </mat-form-field>
+          @if (desde() || hasta()) {
+            <button mat-button type="button" (click)="limpiarRango()">Limpiar fechas</button>
+          }
+
+          <div class="chips" role="group" aria-label="Estado del aviso">
+            <button type="button" class="chip" [class.chip--activo]="filtroAviso() === 'todos'" (click)="filtroAviso.set('todos')">
+              Todos <span class="chip__count">{{ avisos().length }}</span>
+            </button>
+            <button type="button" class="chip" [class.chip--activo]="filtroAviso() === 'pendientes'" (click)="filtroAviso.set('pendientes')">
+              Pendientes <span class="chip__count">{{ pendientes() }}</span>
+            </button>
+            <button type="button" class="chip" [class.chip--activo]="filtroAviso() === 'enviados'" (click)="filtroAviso.set('enviados')">
+              Enviados <span class="chip__count">{{ avisos().length - pendientes() }}</span>
+            </button>
+          </div>
+        </div>
+
+        @if (errorAvisos()) {
+          <p class="error">{{ errorAvisos() }}</p>
+        }
+
+        @if (cargandoAvisos()) {
+          <div class="cargando"><mat-spinner diameter="28"></mat-spinner></div>
+        } @else if (avisosFiltrados().length === 0) {
+          <mat-card class="bloque">
+            <p class="vacio">No hay avisos programados con este filtro.</p>
+          </mat-card>
+        } @else {
+          <mat-card class="bloque">
+            <ul class="lista">
+              @for (a of avisosFiltrados(); track a.id) {
+                <li>
+                  <button type="button" class="lista__item" (click)="abrirTarea(a.taskId, a.projectId)">
+                    <mat-icon class="aviso__icono" [class.aviso__icono--ok]="!!a.sentAt">
+                      {{ a.sentAt ? 'mark_email_read' : 'schedule_send' }}
+                    </mat-icon>
+                    <span class="lista__texto">
+                      <span class="lista__titulo">{{ a.taskTitle }}</span>
+                      <span class="lista__sub">
+                        Para {{ a.recipientFullName }}
+                        @if (a.projectName) { · {{ a.projectName }} }
+                      </span>
+                    </span>
+                    <span class="lista__fecha">
+                      {{ a.sentAt ? 'Enviado ' + fechaHora(a.sentAt) : 'Se enviará ' + fechaHora(a.sendAt) }}
+                    </span>
+                    <span class="badge" [class.badge--ok]="!!a.sentAt">
+                      {{ a.sentAt ? 'Enviado' : 'Pendiente' }}
+                    </span>
+                  </button>
+                </li>
+              }
+            </ul>
+          </mat-card>
+        }
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

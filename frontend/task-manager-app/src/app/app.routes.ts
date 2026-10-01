@@ -40,6 +40,10 @@ export const routes: Routes = [
       import('./shared/components/app-shell/app-shell.component').then((m) => m.AppShellComponent),
     children: [
       {
+        path: 'inicio',
+        loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
+      },
+      {
         path: 'proyectos',
         loadComponent: () =>
           import('./features/proyectos/proyectos.component').then((m) => m.ProyectosComponent),

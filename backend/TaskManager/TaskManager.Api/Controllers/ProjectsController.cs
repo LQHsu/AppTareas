@@ -158,6 +158,114 @@ public class ProjectsController : ControllerBase
         return Ok(ToDto(project));
     }
 
+    // DELETE /api/projects/{id}
+    // Solo el dueno. Dos caminos segun el historial del proyecto:
+    // - Nunca tuvo tareas: se borra de verdad (junto con sus miembros),
+    //   no hay nada que recuperar. Se cuentan TAMBIEN las de la papelera
+    //   (IgnoreQueryFilters): un proyecto con todo en la papelera no esta
+    //   vacio, tiene comentarios, adjuntos e historial.
+    // - Ya tuvo tareas: borrado logico (IsDeleted). Las tareas se ocultan
+    //   solas por el filtro global de AppDbContext y vuelven al restaurar.
+    // La respuesta dice cual de los dos pasó, para que la UI avise bien.
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult<DeleteProjectResultDto>> Delete(Guid id)
+    {
+        var userId = GetUserIdFromToken();
+
+        var project = await _db.Projects
+            .Include(p => p.Members)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (project is null) return NotFound();
+        if (project.OwnerId != userId) return Forbid();
+
+        var tuvoTareas = await _db.Tasks.IgnoreQueryFilters().AnyAsync(t => t.ProjectId == id);
+
+        if (!tuvoTareas)
+        {
+            try
+            {
+                _db.ProjectMembers.RemoveRange(project.Members);
+                _db.Projects.Remove(project);
+                await _db.SaveChangesAsync();
+                return Ok(new DeleteProjectResultDto(true));
+            }
+            catch (DbUpdateException)
+            {
+                // Alguien creo una tarea entre la comprobacion y el
+                // borrado: la FK lo impide. Se cae al borrado logico.
+                _db.ChangeTracker.Clear();
+                project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id);
+                if (project is null) return NotFound();
+            }
+        }
+
+        project.IsDeleted = true;
+        project.DeletedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return Ok(new DeleteProjectResultDto(false));
+    }
+
+    // GET /api/projects/trash
+    // Papelera de proyectos: los que el usuario actual borro (solo el
+    // dueno puede borrar, asi que son sus proyectos).
+    [HttpGet("trash")]
+    public async Task<ActionResult<IEnumerable<ProjectTrashItemDto>>> GetTrash()
+    {
+        var userId = GetUserIdFromToken();
+
+        var proyectos = await _db.Projects
+            .IgnoreQueryFilters()
+            .Where(p => p.IsDeleted && p.OwnerId == userId)
+            .OrderByDescending(p => p.DeletedAt)
+            .ToListAsync();
+
+        var ids = proyectos.Select(p => p.Id).ToList();
+
+        // Conteo aparte: p.Tasks se filtraria por el proyecto borrado y
+        // daria siempre 0. Sin las tareas que ya estaban en su papelera.
+        var totales = await _db.Tasks
+            .IgnoreQueryFilters()
+            .Where(t => t.ProjectId != null && ids.Contains(t.ProjectId.Value) && !t.IsDeleted)
+            .GroupBy(t => t.ProjectId!.Value)
+            .Select(g => new { ProjectId = g.Key, Total = g.Count() })
+            .ToDictionaryAsync(x => x.ProjectId, x => x.Total);
+
+        return Ok(proyectos.Select(p => new ProjectTrashItemDto(
+            p.Id, p.Name, p.Description, p.Color, p.DeletedAt!.Value,
+            totales.GetValueOrDefault(p.Id))));
+    }
+
+    // POST /api/projects/{id}/restore
+    // Deshace el borrado logico. Sus tareas reaparecen solas.
+    [HttpPost("{id:guid}/restore")]
+    public async Task<ActionResult<ProjectDto>> Restore(Guid id)
+    {
+        var userId = GetUserIdFromToken();
+
+        var project = await _db.Projects
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (project is null) return NotFound();
+        if (project.OwnerId != userId) return Forbid();
+        if (!project.IsDeleted) return BadRequest("Ese proyecto no esta en la papelera.");
+
+        project.IsDeleted = false;
+        project.DeletedAt = null;
+        await _db.SaveChangesAsync();
+
+        var full = await _db.Projects
+            .Include(p => p.Area)
+            .Include(p => p.Owner)
+            .Include(p => p.Tasks)
+            .Include(p => p.Folder).ThenInclude(f => f!.SharedWith)
+            .FirstAsync(p => p.Id == id);
+
+        return Ok(ToDto(full));
+    }
+
     private static ProjectDto ToDto(Project p) => new(
         p.Id, p.Name, p.Description,
         p.AreaId, p.Area.Nombre, p.OwnerId, p.Owner.FullName,

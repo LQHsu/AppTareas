@@ -14,6 +14,32 @@
         }
       </mat-select>
     </mat-form-field>
+
+    <!-- Rango por fecha del ultimo cambio de estado. Cada extremo se
+         guarda en su signal al elegirlo; null = lado abierto. -->
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="filtro-campo">
+      <mat-label>Último cambio de estado</mat-label>
+      <mat-date-range-input [rangePicker]="rangoPicker">
+        <input
+          matStartDate
+          placeholder="Desde"
+          [value]="fechaDesde()"
+          (dateChange)="fechaDesde.set($event.value)"
+        />
+        <input
+          matEndDate
+          placeholder="Hasta"
+          [value]="fechaHasta()"
+          (dateChange)="fechaHasta.set($event.value)"
+        />
+      </mat-date-range-input>
+      <mat-datepicker-toggle matIconSuffix [for]="rangoPicker"></mat-datepicker-toggle>
+      <mat-date-range-picker #rangoPicker></mat-date-range-picker>
+    </mat-form-field>
+
+    @if (fechaDesde() || fechaHasta()) {
+      <button mat-button type="button" (click)="limpiarFechas()">Limpiar fechas</button>
+    }
   </div>
 
   <!-- TARJETAS -->
@@ -49,6 +75,8 @@
       </span>
     </mat-card>
   </div>
+
+
 
   <!-- GRAFICO -->
   <mat-card class="grafico">
@@ -104,4 +132,29 @@
       </div>
     }
   </mat-card>
+
+  <!-- LISTA RAPIDA: solo con un filtro activo -->
+  @if (hayFiltro() && total() > 0) {
+    <mat-card class="lista-rapida">
+      <h3 class="grafico__titulo">Tareas ({{ total() }})</h3>
+      <ul class="lista-rapida__items">
+        @for (t of filteredTasks(); track t.id) {
+          <li>
+            <button type="button" class="lista-rapida__item" (click)="taskClick.emit(t)">
+              <span
+                class="lista-rapida__estado"
+                [style.background]="statusColor(t.status)"
+                [attr.title]="statusLabel(t.status)"
+                [attr.aria-label]="'Estado: ' + statusLabel(t.status)"
+              ></span>
+              <span class="lista-rapida__titulo">{{ t.title }}</span>
+              @if (t.parentTaskId) {
+                <span class="lista-rapida__tag">subtarea</span>
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    </mat-card>
+  }
 </div>

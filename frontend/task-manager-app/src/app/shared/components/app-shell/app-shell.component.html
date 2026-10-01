@@ -15,6 +15,20 @@
 
     <nav class="shell-links">
       <a
+        routerLink="/inicio"
+        routerLinkActive="shell-link--active"
+        class="shell-link"
+        matTooltip="Inicio"
+        [matTooltipDisabled]="expanded()"
+        matTooltipPosition="right"
+      >
+        <mat-icon>home</mat-icon>
+        @if (expanded()) {
+          <span>Inicio</span>
+        }
+      </a>
+
+      <a
         routerLink="/carpetas"
         routerLinkActive="shell-link--active"
         class="shell-link"

@@ -8,5 +8,44 @@
       (input)="onBuscar($event)"
     />
   </div>
+
+  <button
+    type="button"
+    class="filtro-estados__boton"
+    [class.filtro-estados__boton--activo]="estadosSeleccionados().size > 0"
+    (click)="toggleFiltroEstados($event)"
+  >
+    <mat-icon inline>filter_list</mat-icon>
+    {{ etiquetaFiltroEstados() }}
+  </button>
 </div>
+
+@if (filtroEstadosAbierto()) {
+  <div
+    class="filtro-estados__panel"
+    [style.top.px]="panelPos().top"
+    [style.left.px]="panelPos().left"
+    (click)="$event.stopPropagation()"
+  >
+    @for (op of opcionesEstado; track op.value) {
+      <label class="filtro-estados__opcion">
+        <input
+          type="checkbox"
+          [checked]="estadosSeleccionados().has(op.value)"
+          (change)="toggleEstado(op.value)"
+        />
+        {{ op.label }}
+      </label>
+    }
+    <button type="button" class="filtro-estados__limpiar" (click)="limpiarEstados()">
+      Limpiar
+    </button>
+  </div>
+}
+
+@if (errorAdjunto()) {
+  <div class="tareas-tabla-error">{{ errorAdjunto() }}</div>
+}
+
+<input #inputArchivo type="file" hidden (change)="onArchivoElegido($event)" />
 <div #contenedor class="tareas-tabla-tabulator"></div>

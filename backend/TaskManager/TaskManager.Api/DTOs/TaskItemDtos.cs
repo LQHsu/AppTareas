@@ -53,13 +53,17 @@ public record CreateTaskDto(
     Guid? ProjectId,
     string? AssignedToId,
     Guid? ParentTaskId,
-    DateTime? FechaLimite = null
+    DateTime? FechaLimite = null,
+    // Si viene y esta en el futuro, el aviso de asignacion no sale al
+    // instante: se encola y sale a esa hora (UTC). Nulo = aviso inmediato.
+    DateTime? NotificarEn = null
 );
 
 public record UpdateTaskStatusDto(TaskItemStatus Status);
 
 // AssignedToId nulo = quitar la asignacion (vuelve a quedar sin asignar).
-public record UpdateTaskAssigneeDto(string? AssignedToId);
+// NotificarEn: igual que en CreateTaskDto.
+public record UpdateTaskAssigneeDto(string? AssignedToId, DateTime? NotificarEn = null);
 
 // Description viene como HTML (lo produce app-editor-texto). FechaLimite
 // nula = sin fecha limite (tambien sirve para quitarsela a una que ya
@@ -102,4 +106,17 @@ public record TaskTrashItemDto(
     string? AssignedToFullName,
     DateTime DeletedAt,
     string DeletedByFullName
+);
+// Aviso de asignacion programado (ver ScheduledTaskNotification), para la
+// pestana "Avisos programados" de Inicio. Estado = Pendiente (SentAt y
+// CancelledAt nulos) o Enviado (SentAt con valor).
+public record ScheduledNotificationDto(
+    Guid Id,
+    Guid TaskId,
+    string TaskTitle,
+    Guid? ProjectId,
+    string? ProjectName,
+    string RecipientFullName,
+    DateTime SendAt,
+    DateTime? SentAt
 );

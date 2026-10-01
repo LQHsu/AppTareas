@@ -19,6 +19,7 @@ import {
   TaskItemDto,
   TaskItemStatus,
   fechaLimiteToString,
+  notificarEnToIso,
 } from '../../core/services/task.service';
 import { UserService, UserDto } from '../../core/services/user.service';
 import { TaskCommentService } from '../../core/services/task-comment.service';
@@ -27,6 +28,7 @@ import { TareaDetalleDialogComponent } from '../../shared/components/tarea-detal
 import { MarcarAtendidaDialogComponent } from '../../shared/components/marcar-atendida-dialog/marcar-atendida-dialog.component';
 import { PapeleraDialogComponent } from '../../shared/components/papelera-dialog/papelera-dialog.component';
 import { EditorTextoComponent } from '../../shared/components/editor-texto/editor-texto.component';
+import { FechaHoraPickerComponent } from '../../shared/components/fecha-hora-picker/fecha-hora-picker.component';
 import { RealtimeService } from '../../core/services/realtime.service';
 
 // Vista personal: todo lo asignado al usuario, sin importar de que
@@ -55,6 +57,7 @@ import { RealtimeService } from '../../core/services/realtime.service';
     MatTooltipModule,
     TareasTablaComponent,
     EditorTextoComponent,
+    FechaHoraPickerComponent,
   ],
   templateUrl: './mis-tareas.component.html',
   styleUrl: './mis-tareas.component.scss',
@@ -87,6 +90,9 @@ export class MisTareasComponent implements OnInit, OnDestroy {
       // Puramente informativa (ver comentario en TaskItem.cs) - Date de
       // mat-datepicker, o null si no se elige (ver fechaLimiteToString).
       fechaLimite: [null as Date | null],
+      // Valor de <input type="datetime-local"> (hora local, texto) o ''
+      // si no se programa: el aviso de asignacion sale al instante.
+      notificarEn: [''],
     });
   }
 
@@ -189,6 +195,7 @@ export class MisTareasComponent implements OnInit, OnDestroy {
     const description = this.taskForm.value.description || null;
     const assignedToIds: string[] = this.taskForm.value.assignedToIds || [];
     const fechaLimite = fechaLimiteToString(this.taskForm.value.fechaLimite ?? null);
+    const notificarEn = notificarEnToIso(this.taskForm.value.notificarEn);
 
     // Igual que en proyecto-detalle: sin nadie seleccionado se crea una
     // sola tarea suelta sin asignar; con varias personas, una tarea
@@ -204,6 +211,7 @@ export class MisTareasComponent implements OnInit, OnDestroy {
           assignedToId,
           parentTaskId: null,
           fechaLimite,
+          notificarEn,
         })
         .pipe(catchError(() => of(null)))
     );

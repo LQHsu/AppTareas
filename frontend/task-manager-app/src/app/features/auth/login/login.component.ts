@@ -40,7 +40,7 @@ export class LoginComponent implements OnInit {
       this.checkingSession = false;
 
       if (user) {
-        this.router.navigate(['/proyectos']);
+        this.router.navigate(['/inicio']);
       } else {
         this.router.navigate(['/completar-registro']);
       }

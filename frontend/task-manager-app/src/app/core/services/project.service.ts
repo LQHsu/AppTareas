@@ -40,6 +40,22 @@ export interface CreateProjectDto {
   color?: string | null;
 }
 
+// permanent = true: se borro de verdad (nunca tuvo tareas). false: fue a
+// la papelera y se puede restaurar.
+export interface DeleteProjectResultDto {
+  permanent: boolean;
+}
+
+// Fila de la papelera de proyectos (solo los que borro el usuario actual).
+export interface ProjectTrashItemDto {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  deletedAt: string;
+  totalTasks: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
   private readonly baseUrl = `${environment.apiUrl}/projects`;
@@ -72,5 +88,19 @@ export class ProjectService {
   // folderId null = sacarlo de la carpeta en la que este.
   moveToFolder(id: string, folderId: string | null): Observable<ProjectDto> {
     return this.http.patch<ProjectDto>(`${this.baseUrl}/${id}/folder`, { folderId });
+  }
+
+  // Solo el dueno. Sin tareas en su historial se borra de verdad; si ya
+  // tuvo tareas, va a la papelera (ver DeleteProjectResultDto).
+  delete(id: string): Observable<DeleteProjectResultDto> {
+    return this.http.delete<DeleteProjectResultDto>(`${this.baseUrl}/${id}`);
+  }
+
+  getTrash(): Observable<ProjectTrashItemDto[]> {
+    return this.http.get<ProjectTrashItemDto[]>(`${this.baseUrl}/trash`);
+  }
+
+  restore(id: string): Observable<ProjectDto> {
+    return this.http.post<ProjectDto>(`${this.baseUrl}/${id}/restore`, {});
   }
 }

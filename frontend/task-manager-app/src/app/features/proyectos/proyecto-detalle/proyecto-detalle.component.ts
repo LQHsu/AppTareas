@@ -25,6 +25,7 @@ import {
   TaskItemDto,
   TaskItemStatus,
   fechaLimiteToString,
+  notificarEnToIso,
 } from '../../../core/services/task.service';
 import { ProjectService, ProjectDto } from '../../../core/services/project.service';
 import {
@@ -39,6 +40,7 @@ import { MarcarAtendidaDialogComponent } from '../../../shared/components/marcar
 import { ProyectoEstadisticasComponent } from '../proyecto-estadisticas/proyecto-estadisticas.component';
 import { ProyectoArchivosComponent } from '../proyecto-archivos/proyecto-archivos.component';
 import { EditorTextoComponent } from '../../../shared/components/editor-texto/editor-texto.component';
+import { FechaHoraPickerComponent } from '../../../shared/components/fecha-hora-picker/fecha-hora-picker.component';
 import { ColorPickerComponent } from '../../../shared/components/color-picker/color-picker.component';
 import { TareaDetalleDialogComponent } from '../../../shared/components/tarea-detalle-dialog/tarea-detalle-dialog.component';
 import { PapeleraDialogComponent } from '../../../shared/components/papelera-dialog/papelera-dialog.component';
@@ -68,6 +70,7 @@ import { RealtimeService } from '../../../core/services/realtime.service';
     ProyectoEstadisticasComponent,
     ProyectoArchivosComponent,
     EditorTextoComponent,
+    FechaHoraPickerComponent,
     ColorPickerComponent,
   ],
   templateUrl: './proyecto-detalle.component.html',
@@ -129,6 +132,9 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     // Puramente informativa (ver comentario en TaskItem.cs) - Date de
     // mat-datepicker, o null si no se elige (ver fechaLimiteToString).
     fechaLimite: [null as Date | null],
+    // Valor de <input type="datetime-local"> (hora local, texto) o ''
+    // si no se programa: el aviso de asignacion sale al instante.
+    notificarEn: [''],
   });}
 
   private realtimeSub?: Subscription;
@@ -184,7 +190,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     this.showCreateTaskForm.set(false);
     this.showInviteForm.set(false);
     this.selectedInviteeId.set(null);
-    this.taskForm.reset({ title: '', description: '', assignedToIds: [], fechaLimite: null });
+    this.taskForm.reset({ title: '', description: '', assignedToIds: [], fechaLimite: null, notificarEn: '' });
   }
 
   loadOtrosProyectos(): void {
@@ -243,6 +249,25 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Sin tareas en su historial se borra de verdad; si ya las tuvo, va a la
+  // papelera de proyectos (se restaura desde /proyectos). Solo el dueno.
+  eliminarProyecto(): void {
+    const p = this.project();
+    if (!p) return;
+
+    const ok = window.confirm(
+      `¿Eliminar el proyecto «${p.name}»?\n\n` +
+        'Si ya tuvo tareas, se mueve a la papelera y lo puedes restaurar con todo su contenido. ' +
+        'Si nunca tuvo tareas, se elimina definitivamente.'
+    );
+    if (!ok) return;
+
+    this.projectService.delete(this.projectId).subscribe({
+      next: () => this.router.navigate(['/proyectos']),
+      error: () => this.errorMessage.set('No se pudo eliminar el proyecto.'),
+    });
+  }
+
   loadProject(): void {
     this.loadingProject.set(true);
     this.projectService.getById(this.projectId).subscribe({
@@ -272,12 +297,28 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
       next: (tasks) => {
         this.tasks.set(tasks);
         this.loadingTasks.set(false);
+        this.abrirTareaDelLink();
       },
       error: () => {
         this.errorMessage.set('No se pudieron cargar las tareas.');
         this.loadingTasks.set(false);
       },
     });
+  }
+
+  // Deep link desde Inicio: "?tarea={id}" abre el detalle de esa tarea (o
+  // el de su padre, si es una subtarea). Se limpia el query param para que
+  // un refresh no la vuelva a abrir. Igual que en MisTareasComponent.
+  private abrirTareaDelLink(): void {
+    const tareaId = this.route.snapshot.queryParamMap.get('tarea');
+    if (!tareaId) return;
+
+    this.router.navigate([], { queryParams: {}, replaceUrl: true });
+
+    const task =
+      this.tasks().find((t) => t.id === tareaId) ??
+      this.tasks().find((t) => t.subtasks.some((s) => s.id === tareaId));
+    if (task) this.openTaskDetail(task);
   }
 
   loadMembers(): void {
@@ -310,6 +351,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     const description = this.taskForm.value.description || null;
     const assignedToIds: string[] = this.taskForm.value.assignedToIds || [];
     const fechaLimite = fechaLimiteToString(this.taskForm.value.fechaLimite ?? null);
+    const notificarEn = notificarEnToIso(this.taskForm.value.notificarEn);
 
     // Si no se elige a nadie, se crea una sola tarea sin asignar. Si se
     // eligen varias personas, no es una tarea compartida: se crea una
@@ -325,6 +367,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
           assignedToId,
           parentTaskId: null,
           fechaLimite,
+          notificarEn,
         })
         .pipe(catchError(() => of(null)))
     );
@@ -357,6 +400,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
           description: '',
           assignedToIds: this.defaultAssignedToIds(),
           fechaLimite: null,
+          notificarEn: '',
         });
       }
     });
@@ -622,6 +666,16 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
   // llamaban desde la tarjeta inline en la lista; despues de cada cambio
   // exitoso, refresca lo que el modal esta mostrando con la version mas
   // reciente de `tasks` (unica fuente de verdad).
+  // Desde la lista rapida de estadisticas, que incluye subtareas. El modal
+  // trabaja con tareas top-level (refresh busca en tasks()), asi que una
+  // subtarea abre el detalle de su tarea padre, donde aparece listada.
+  openTaskFromStats(task: TaskItemDto): void {
+    const target = task.parentTaskId
+      ? (this.tasks().find((t) => t.id === task.parentTaskId) ?? task)
+      : task;
+    this.openTaskDetail(target);
+  }
+
   openTaskDetail(task: TaskItemDto): void {
     const ref = this.dialog.open(TareaDetalleDialogComponent, {
       data: { task, members: this.members(), showProject: false, isProjectOwner: this.isOwner() },

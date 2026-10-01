@@ -201,18 +201,16 @@ public class TaskNotificationService
             {
                 var space = await _chat.FindDmAsync(destinatario.GoogleChatUserId);
 
-                var nombreProyecto = task.Project?.Name ?? "AppTareas";
+                var nombreProyecto = System.Net.WebUtility.HtmlEncode(task.Project?.Name) ?? "AppTareas";
                 await _chat.SendTaskCardAsync(
                     space,
                     task.Id,
+                   
                     $"Proyecto: {nombreProyecto}",
 
                     // https://developers.google.com/workspace/chat/format-messages#card_text_formatting
                     string.Format(chatText, tituloEscapado),
 
-                    // El boton "Marcar como Atendida" todavia no es
-                    // interactivo bajo el runtime de Add-ons - ninguno
-                    // de estos avisos lo pide.
                     incluirBotonAtendida: false,
                     assignedUserId: destinatario.Id
                 );

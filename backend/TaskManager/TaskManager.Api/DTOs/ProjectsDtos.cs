@@ -1,5 +1,19 @@
 namespace TaskManager.Api.DTOs;
 
+// Resultado de DELETE /api/projects/{id}: Permanent = true si se borro de
+// verdad (nunca tuvo tareas), false si fue a la papelera (se puede restaurar).
+public record DeleteProjectResultDto(bool Permanent);
+
+// Fila de la papelera de proyectos (solo los del usuario actual).
+public record ProjectTrashItemDto(
+    Guid Id,
+    string Name,
+    string? Description,
+    string? Color,
+    DateTime DeletedAt,
+    int TotalTasks
+);
+
 public record ProjectDto(
     Guid Id,
     string Name,

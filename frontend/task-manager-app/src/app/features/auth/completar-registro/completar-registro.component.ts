@@ -123,14 +123,14 @@ export class CompletarRegistroComponent implements OnInit {
       })
       .subscribe({
         next: () => {
-          this.router.navigate(['/proyectos']);
+          this.router.navigate(['/inicio']);
         },
         error: (err) => {
           this.submitting.set(false);
 
           if (err.status === 409) {
             this.errorMessage.set('Tu usuario ya estaba registrado. Redirigiendo...');
-            setTimeout(() => this.router.navigate(['/proyectos']), 1500);
+            setTimeout(() => this.router.navigate(['/inicio']), 1500);
           } else if (err.status === 403 && err.error?.error === 'not_whitelisted') {
             // Numero economico valido en Keycloak/CUSXACDI, pero nadie lo
             // dio de alta todavia (ver CoordinadorController) - no es un

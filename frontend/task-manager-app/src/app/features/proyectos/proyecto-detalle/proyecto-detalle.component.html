@@ -81,6 +81,15 @@
               <mat-icon>edit</mat-icon>
               Editar
             </button>
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="eliminarProyecto()"
+              aria-label="Eliminar proyecto"
+            >
+              <mat-icon>delete_outline</mat-icon>
+              Eliminar
+            </button>
           }
         </div>
       </header>
@@ -147,6 +156,13 @@
                 <mat-datepicker #fechaLimitePicker></mat-datepicker>
               </mat-form-field>
 
+              <app-fecha-hora-picker
+                class="create-field"
+                formControlName="notificarEn"
+                label="Enviar aviso de asignación el… (opcional)"
+                hint="Si lo dejas vacío, el aviso sale de inmediato."
+              />
+
               <div class="create-actions">
                 <button mat-button type="button" (click)="toggleCreateTaskForm()">Cancelar</button>
                 <button mat-flat-button color="primary" type="submit" [disabled]="creatingTask()">
@@ -188,7 +204,11 @@
             <p>Cargando estadísticas…</p>
           </div>
         } @else {
-          <app-proyecto-estadisticas [tasks]="tasks()" [members]="members()" />
+          <app-proyecto-estadisticas
+            [tasks]="tasks()"
+            [members]="members()"
+            (taskClick)="openTaskFromStats($event)"
+          />
         }
       </div>
     </mat-tab>

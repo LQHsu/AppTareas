@@ -149,6 +149,81 @@ public class TasksController : ControllerBase
         return Ok(tasks.Select(t => ToDto(t, conteos)).ToList());
     }
 
+    // GET /api/tasks/modified?from=...&to=...
+    // Resumen de Inicio: tareas que el usuario puede ver y que se
+    // modificaron (UpdatedAt) dentro de [from, to). "Puede ver" = las de
+    // proyectos donde es dueno/miembro, mas las que creo o tiene
+    // asignadas (incluye sueltas). Lista plana, subtareas incluidas.
+    [HttpGet("modified")]
+    public async Task<ActionResult<IEnumerable<TaskItemDto>>> GetModified(
+        [FromQuery] DateTime from, [FromQuery] DateTime to)
+    {
+        var userId = GetUserIdFromToken();
+        var desde = from.ToUniversalTime();
+        var hasta = to.ToUniversalTime();
+
+        var tasks = await _db.Tasks
+            .Include(t => t.Project)
+            .ThenInclude(p => p!.Folder)
+            .Include(t => t.CreatedBy)
+            .Include(t => t.AssignedTo)
+            .Include(t => t.StatusHistory)
+            .Where(t => t.UpdatedAt >= desde && t.UpdatedAt < hasta)
+            .Where(t => t.AssignedToId == userId
+                || t.CreatedById == userId
+                || (t.Project != null
+                    && (t.Project.OwnerId == userId || t.Project.Members.Any(m => m.UserId == userId))))
+            .OrderByDescending(t => t.UpdatedAt)
+            .ToListAsync();
+
+        var conteos = await CargarConteos(tasks.Select(t => t.Id).ToList());
+
+        return Ok(tasks.Select(t => ToDto(t, conteos)).ToList());
+    }
+
+    // GET /api/tasks/scheduled-notifications?from=...&to=...
+    // Avisos de asignacion programados por el usuario (de tareas que el
+    // creo), pendientes y ya enviados; los cancelados no se listan. from/to
+    // opcionales: filtran por la hora programada (SendAt). Maximo 200,
+    // los mas recientes primero.
+    [HttpGet("scheduled-notifications")]
+    public async Task<ActionResult<IEnumerable<ScheduledNotificationDto>>> GetScheduledNotifications(
+        [FromQuery] DateTime? from, [FromQuery] DateTime? to)
+    {
+        var userId = GetUserIdFromToken();
+
+        var query = _db.ScheduledTaskNotifications
+            .Where(n => n.CancelledAt == null && n.Task.CreatedById == userId);
+
+        if (from.HasValue) { var d = from.Value.ToUniversalTime(); query = query.Where(n => n.SendAt >= d); }
+        if (to.HasValue) { var h = to.Value.ToUniversalTime(); query = query.Where(n => n.SendAt < h); }
+
+        var avisos = await query
+            .OrderByDescending(n => n.SendAt)
+            .Take(200)
+            .Select(n => new
+            {
+                n.Id,
+                n.TaskId,
+                n.Task.Title,
+                n.Task.ProjectId,
+                ProjectName = n.Task.Project != null ? n.Task.Project.Name : null,
+                n.RecipientId,
+                n.SendAt,
+                n.SentAt,
+            })
+            .ToListAsync();
+
+        var ids = avisos.Select(a => a.RecipientId).Distinct().ToList();
+        var nombres = await _db.Users
+            .Where(u => ids.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.FullName);
+
+        return Ok(avisos.Select(a => new ScheduledNotificationDto(
+            a.Id, a.TaskId, a.Title, a.ProjectId, a.ProjectName,
+            nombres.GetValueOrDefault(a.RecipientId, "—"), a.SendAt, a.SentAt)));
+    }
+
     // POST /api/tasks
     // Si ProjectId viene null y ParentTaskId tambien viene null, es una
     // tarea suelta: se valida que el asignado (si hay) pertenezca a la
@@ -276,10 +351,7 @@ public class TasksController : ControllerBase
 
         // Nace ya asignada (se elegio a alguien en el form de creacion) -
         // avisar por correo/Chat, best-effort (ver TaskNotificationService).
-        if (full.AssignedTo is not null)
-        {
-            await _notifications.NotifyTaskAssignedAsync(full, full.AssignedTo);
-        }
+        await AvisarAsignacionAsync(full, dto.NotificarEn);
 
         return CreatedAtAction(nameof(GetByProject), new { projectId }, resultDto);
     }
@@ -590,6 +662,20 @@ public class TasksController : ControllerBase
         task.AssignedToId = assignedToId;
         task.UpdatedAt = DateTime.UtcNow;
 
+        // Si habia un aviso de asignacion programado y todavia no salio,
+        // ya no aplica: era para el asignado anterior. Se cancela en el
+        // mismo SaveChanges de abajo.
+        if (assigneeCambio)
+        {
+            var pendientes = await _db.ScheduledTaskNotifications
+                .Where(n => n.TaskId == task.Id && n.SentAt == null && n.CancelledAt == null)
+                .ToListAsync();
+            foreach (var pendiente in pendientes)
+            {
+                pendiente.CancelledAt = DateTime.UtcNow;
+            }
+        }
+
         if (assignedToId is not null)
         {
             task.FechaAsignacion = DateTime.UtcNow;
@@ -630,12 +716,46 @@ public class TasksController : ControllerBase
         // Solo si de verdad cambio el asignado (no en un "reasignar" a la
         // misma persona) y quedo alguien asignado (no en un "quitar
         // asignacion").
-        if (assigneeCambio && full.AssignedTo is not null)
+        if (assigneeCambio)
         {
-            await _notifications.NotifyTaskAssignedAsync(full, full.AssignedTo);
+            await AvisarAsignacionAsync(full, dto.NotificarEn);
         }
 
         return Ok(resultDto);
+    }
+
+    // Avisa de la asignacion: al instante, o encolado si NotificarEn es
+    // una hora futura (lo manda ScheduledNotificationWorker). Sin asignado
+    // no hace nada. Una fecha pasada o de "ahora mismo" se trata como
+    // aviso inmediato, para no dejar en cola algo que ya vencio.
+    private async Task AvisarAsignacionAsync(TaskItem task, DateTime? notificarEn)
+    {
+        if (task.AssignedTo is null) return;
+
+        if (notificarEn is { } cuando)
+        {
+            // Un Kind=Unspecified (JSON sin "Z") se asume UTC, igual que
+            // el resto de fechas del proyecto (ver AppDbContext).
+            var sendAt = cuando.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(cuando, DateTimeKind.Utc)
+                : cuando.ToUniversalTime();
+
+            if (sendAt > DateTime.UtcNow)
+            {
+                _db.ScheduledTaskNotifications.Add(new ScheduledTaskNotification
+                {
+                    Id = Guid.NewGuid(),
+                    TaskId = task.Id,
+                    RecipientId = task.AssignedTo.Id,
+                    SendAt = sendAt,
+                    CreatedAt = DateTime.UtcNow,
+                });
+                await _db.SaveChangesAsync();
+                return;
+            }
+        }
+
+        await _notifications.NotifyTaskAssignedAsync(task, task.AssignedTo);
     }
 
     // PATCH /api/tasks/{id}/details
