@@ -27,3 +27,12 @@ frontend/**/.angular/
 !.vscode/extensions.json
 .DS_Store
 Thumbs.db
+
+# --- CI/CD: nunca versionar llaves ni salidas de build ---
+signing-private.pem
+signing-public.pem
+*.pem
+artifacts/
+stage/
+out/
+mapping/

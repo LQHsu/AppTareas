@@ -1,0 +1,38 @@
+name: CI
+
+# Valida que el codigo compila (backend con ofuscacion incluida, y frontend)
+# en cada PR y en cada push a master. No despliega nada.
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build backend (publish + ofuscacion)
+        shell: pwsh
+        run: ./scripts/build-backend.ps1 -OutDir ./artifacts/api -MappingDir ./artifacts/mapping
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/task-manager-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/task-manager-app/package-lock.json
+      - run: npm ci
+      - run: npx ng build --configuration production

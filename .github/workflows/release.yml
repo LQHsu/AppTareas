@@ -1,0 +1,119 @@
+name: Release
+
+# Se dispara solo al crear un tag vX.Y.Z. Deja un release en DRAFT, SIN FIRMAR,
+# en el repo privado de releases. El servidor solo despliega releases firmados
+# y publicados, y la llave de firma NO esta en GitHub: la firma y la publicacion
+# las haces tu, a mano, con scripts/sign-release.ps1 desde tu maquina. Asi, aunque
+# alguien tome tu cuenta de GitHub o robe RELEASES_TOKEN, no puede producir un
+# release que el servidor acepte.
+#
+# Dos jobs a proposito:
+#   build   -> compila y empaqueta. NO tiene acceso a ningun secreto.
+#   publish -> sube el draft. Es el unico que ve RELEASES_TOKEN y no hace
+#              checkout ni ejecuta codigo del repo, solo `gh` sobre los artefactos.
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+env:
+  RELEASES_REPO: LQHsu/AppTareas-releases
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: El tag debe estar en master
+        shell: bash
+        run: |
+          git fetch origin master
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/master || {
+            echo "::error::El tag $GITHUB_REF_NAME no apunta a un commit de master"; exit 1; }
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/task-manager-app/package-lock.json
+
+      - name: Backend (publish + ofuscacion + sin pdb)
+        shell: pwsh
+        run: ./scripts/build-backend.ps1 -OutDir ./stage/api -MappingDir ./mapping
+
+      - name: Frontend (produccion, sin sourcemaps)
+        shell: pwsh
+        working-directory: frontend/task-manager-app
+        run: |
+          npm ci
+          npx ng build --configuration production --output-path ../../stage/frontend
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Bundle de migraciones (efbundle.exe, no hace falta SDK en el servidor)
+        shell: pwsh
+        run: |
+          dotnet tool install --global dotnet-ef
+          dotnet ef migrations bundle `
+            --project backend/TaskManager/TaskManager.Infrastructure `
+            --startup-project backend/TaskManager/TaskManager.Api `
+            --self-contained -r win-x64 --force -o ./out/efbundle.exe
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Empaquetar y generar manifest
+        shell: pwsh
+        run: |
+          $ver = '${{ github.ref_name }}'
+          Compress-Archive -Path ./stage/api/* -DestinationPath ./out/api.zip
+          Compress-Archive -Path ./stage/frontend/browser/* -DestinationPath ./out/frontend.zip
+          $files = [ordered]@{}
+          foreach ($n in 'api.zip', 'frontend.zip', 'efbundle.exe') {
+            $files[$n] = (Get-FileHash "./out/$n" -Algorithm SHA256).Hash.ToLower()
+          }
+          [ordered]@{
+            version    = $ver
+            commit     = '${{ github.sha }}'
+            createdUtc = (Get-Date).ToUniversalTime().ToString('o')
+            files      = $files
+          } | ConvertTo-Json -Depth 4 | Set-Content ./out/manifest.json -Encoding utf8NoBOM
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-files
+          path: out/*
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          # Mapping de ofuscacion: sirve para des-ofuscar stack traces. Se
+          # queda en GitHub (privado), nunca va al servidor.
+          name: obfuscation-mapping
+          path: mapping/*
+          retention-days: 90
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-files
+          path: out
+
+      - name: Subir draft SIN FIRMAR al repo de releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          # Queda en draft: el servidor usa releases/latest, que ignora drafts.
+          # Se publica con scripts/sign-release.ps1 (verifica, firma y publica).
+          gh release create "$GITHUB_REF_NAME" out/* \
+            --repo "$RELEASES_REPO" --title "$GITHUB_REF_NAME" \
+            --notes "Build de $GITHUB_REF_NAME pendiente de firma" --draft
