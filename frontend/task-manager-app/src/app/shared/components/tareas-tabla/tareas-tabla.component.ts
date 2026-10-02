@@ -74,6 +74,17 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
   // tipos de filtro con AND automaticamente (ver setFilter en initTabla).
   private terminoBusqueda = '';
 
+  // Filtro por rol (antes headerFilter de la columna Rol). '' = todos;
+  // 'asignada' / 'creada' buscan dentro de FilaTarea.rolLabel, asi quien
+  // es ambas ("Asignada y creada por mí") sale en los dos filtros (con el
+  // startsWith anterior no salia en ninguno).
+  rolFiltro = '';
+
+  onRolFiltro(event: Event): void {
+    this.rolFiltro = (event.target as HTMLSelectElement).value;
+    this.tabulator?.refreshFilter();
+  }
+
   onBuscar(event: Event): void {
     this.terminoBusqueda = (event.target as HTMLInputElement).value.trim().toLowerCase();
     this.tabulator?.refreshFilter();
@@ -159,6 +170,7 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
   private coincideBusqueda = (data: FilaTarea): boolean => {
     const estados = this.estadosSeleccionados();
     if (estados.size > 0 && !estados.has(data.status)) return false;
+    if (this.rolFiltro && !data.rolLabel.toLowerCase().includes(this.rolFiltro)) return false;
     if (!this.terminoBusqueda) return true;
     const campos = [
       data.title,
@@ -288,35 +300,6 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
           ]
         : []),
       {
-        title: 'Rol',
-        field: 'rolLabel',
-        headerFilter: 'list',
-        headerFilterParams: {
-          values: { '': 'Todos', 'Asignada a mí': 'Asignada a mí', 'Creada por mí': 'Creada por mí' },
-        },
-        headerFilterFunc: (headerValue, rowValue) =>
-          !headerValue || (rowValue as string).startsWith(headerValue as string),
-        cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
-      },
-      {
-        title: 'Asignada a',
-        field: 'assignedToFullName',
-        widthGrow: 1,
-        // Escapado a mano: tener formatter propio (aunque sea solo para
-        // el "Sin asignar") hace que Tabulator deje de sanear el valor,
-        // a diferencia de "Creada por" aca abajo, que al no tener
-        // formatter pasa por el "plaintext" que si sanea. Ver escaparHtml.
-        formatter: (cell: CellComponent) =>
-          this.escaparHtml((cell.getValue() as string | null) ?? 'Sin asignar'),
-        cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
-      },
-      {
-        title: 'Creada por',
-        field: 'createdByFullName',
-        widthGrow: 1,
-        cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
-      },
-      {
         title: 'Estado',
         field: 'status',
         // (El filtro por estado es el multiselect de la barra superior.)
@@ -358,6 +341,22 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
         formatter: (cell: CellComponent) => this.formatFechaLimite(cell.getValue()),
         sorter: this.sorterFecha,
         cellClick: (_e, cell: CellComponent) => this.rowClick.emit(cell.getRow().getData() as TaskItemDto),
+      },
+      {
+        // Antes eran tres columnas (Rol / Asignada a / Creada por). Se
+        // comprimen en un icono de personas que abre un popup con los tres
+        // datos (ver togglePersonasPopup), igual que el de fechas, y va
+        // justo a su izquierda. El filtro por Rol paso a la barra superior
+        // (rolFiltro) y la busqueda por nombre sigue en coincideBusqueda.
+        title: '',
+        headerTooltip: 'Personas (rol / asignada a / creada por)',
+        headerSort: false,
+        width: 60,
+        hozAlign: 'center',
+        field: 'rolLabel',
+        formatter: () => '<span class="material-icons fecha-celda__icono">group</span>',
+        cellClick: (e: UIEvent, cell: CellComponent) =>
+          this.togglePersonasPopup(e as MouseEvent, cell, cell.getRow().getData() as FilaTarea),
       },
       {
         // Antes eran dos columnas ("Creada" / "Último cambio de estado")
@@ -460,6 +459,23 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
   private cerrarPopupFechasListener: ((ev: MouseEvent) => void) | null = null;
 
   private toggleFechasPopup(event: MouseEvent, cell: CellComponent, task: TaskItemDto): void {
+    this.togglePopup(event, cell, [
+      ['Creada', this.formatFecha(task.createdAt)],
+      ['Último cambio de estado', this.formatFecha(task.lastStatusChangeAt)],
+    ]);
+  }
+
+  private togglePersonasPopup(event: MouseEvent, cell: CellComponent, task: FilaTarea): void {
+    this.togglePopup(event, cell, [
+      ['Rol', task.rolLabel],
+      ['Asignada a', task.assignedToFullName ?? 'Sin asignar'],
+      ['Creada por', task.createdByFullName],
+    ]);
+  }
+
+  // Comun a los popups de fechas y personas. Los valores se escapan aqui
+  // porque el popup se arma con innerHTML y los nombres vienen del usuario.
+  private togglePopup(event: MouseEvent, cell: CellComponent, filas: [string, string][]): void {
     event.stopPropagation();
     const yaAbierto = this.popupFechas !== null;
     this.cerrarFechasPopup();
@@ -467,16 +483,15 @@ export class TareasTablaComponent implements AfterViewInit, OnChanges, OnDestroy
 
     const popup = document.createElement('div');
     popup.className = 'fechas-popup';
-    popup.innerHTML = `
+    popup.innerHTML = filas
+      .map(
+        ([etiqueta, valor]) => `
       <div class="fechas-popup__fila">
-        <span class="fechas-popup__etiqueta">Creada</span>
-        <span>${this.formatFecha(task.createdAt)}</span>
-      </div>
-      <div class="fechas-popup__fila">
-        <span class="fechas-popup__etiqueta">Último cambio de estado</span>
-        <span>${this.formatFecha(task.lastStatusChangeAt)}</span>
-      </div>
-    `;
+        <span class="fechas-popup__etiqueta">${this.escaparHtml(etiqueta)}</span>
+        <span>${this.escaparHtml(valor)}</span>
+      </div>`
+      )
+      .join('');
     document.body.appendChild(popup);
 
     const anclaRect = cell.getElement().getBoundingClientRect();

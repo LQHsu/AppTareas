@@ -31,9 +31,9 @@ public class TaskNotificationService
         SendAsync(
             task,
             assignee,
-            emailSubject: $"Se te asignó una tarea: {task.Title}",
-            emailBodyLead: $"<p>Se te asignó la tarea <strong>{{0}}</strong>.</p>",
-            chatText: "Se te asignó la tarea «<b>{0}</b>»."
+            emailSubject: $"{task.CreatedBy.FullName} te asignó la tarea: {task.Title}",
+            emailBodyLead: $"<p>{task.CreatedBy.FullName} te asignó la tarea <strong>{{0}}</strong>.</p>",
+            chatText: $"{task.CreatedBy.FullName} te asignó la tarea «<b>{{0}}</b>»."
         );
 
     // "Se reanudo una tarea que tenias pausada" - se llama desde
@@ -88,16 +88,41 @@ public class TaskNotificationService
         }
     }
 
-    public async Task NotifyTaskAttendedAsync(TaskItem task, string actorUserId)
+    
+    public async Task NotifyTastCancelledAsync(TaskItem task,string actorUserId)
     {
+     foreach(var persona in PersonasImportantes(task, actorUserId))
+        {
+            await SendAsync(
+                task,
+                persona,
+                emailSubject: $"Se cancelo la tarea: {task.Title}",
+                emailBodyLead: "<p>El creador de la tarea <strong>{0}</strong></p> la ha cancelado.",
+                chatText: "Se cancelo la tarea «<b>{0}</b>"
+            );
+        }   
+    }
+
+    // comentario: la nota que dejo quien la atendio (opcional). Va dentro
+    // de este mismo aviso - el frontend ya no la manda como un comentario
+    // aparte, para que no lleguen dos correos/mensajes por una sola accion.
+    public async Task NotifyTaskAttendedAsync(TaskItem task, string actorUserId, string? comentario = null)
+    {
+        // Las llaves se duplican porque SendAsync pasa el texto por string.Format.
+        var nota = string.IsNullOrWhiteSpace(comentario)
+            ? null
+            : System.Net.WebUtility.HtmlEncode(comentario).Replace("{", "{{").Replace("}", "}}");
+
         foreach (var persona in PersonasImportantes(task, actorUserId))
         {
             await SendAsync(
                 task,
                 persona,
                 emailSubject: $"Se atendió una tarea: {task.Title}",
-                emailBodyLead: "<p>La tarea <strong>{0}</strong> se marcó como atendida.</p>",
+                emailBodyLead: "<p>La tarea <strong>{0}</strong> se marcó como atendida.</p>"
+                    + (nota is null ? "" : $"<p>Comentario:</p><blockquote>{nota}</blockquote>"),
                 chatText: "La tarea «<b>{0}</b>» se marcó como atendida."
+                    + (nota is null ? "" : $" Comentario: {nota}")
             );
         }
     }

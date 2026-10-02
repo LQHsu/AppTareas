@@ -34,7 +34,6 @@ import {
 } from '../../../core/services/project-member.service';
 import { UserService, UserDto } from '../../../core/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { TaskCommentService } from '../../../core/services/task-comment.service';
 import { TareasTablaComponent } from '../../../shared/components/tareas-tabla/tareas-tabla.component';
 import { MarcarAtendidaDialogComponent } from '../../../shared/components/marcar-atendida-dialog/marcar-atendida-dialog.component';
 import { ProyectoEstadisticasComponent } from '../proyecto-estadisticas/proyecto-estadisticas.component';
@@ -116,7 +115,6 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     private router: Router,
     private fb: FormBuilder,
     private taskService: TaskService,
-    private commentService: TaskCommentService,
     private projectService: ProjectService,
     private memberService: ProjectMemberService,
     private userService: UserService,
@@ -140,6 +138,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
   private realtimeSub?: Subscription;
   private realtimeDeleteSub?: Subscription;
   private paramMapSub?: Subscription;
+  private reconnectedSub?: Subscription;
 
   ngOnInit(): void {
     this.loadOtrosProyectos();
@@ -149,6 +148,10 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     // tener que refrescar. Ver RealtimeService y TaskHub en el backend.
     this.realtimeSub = this.realtime.taskChanged$.subscribe((t) => this.applyRealtimeUpdate(t));
     this.realtimeDeleteSub = this.realtime.taskDeleted$.subscribe((d) => this.removeTaskLocal(d.id));
+    // Tras una caida del socket se pudieron perder cambios: recargar.
+    this.reconnectedSub = this.realtime.reconnected$.subscribe(() => {
+      if (this.projectId) this.loadTasks();
+    });
 
     // Suscripcion (no snapshot): el selector "Cambiar de proyecto" del
     // header navega a /proyectos/:id con un id distinto, pero sigue
@@ -179,6 +182,7 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     this.realtime.leaveProject(this.projectId);
     this.realtimeSub?.unsubscribe();
     this.realtimeDeleteSub?.unsubscribe();
+    this.reconnectedSub?.unsubscribe();
     this.paramMapSub?.unsubscribe();
   }
 
@@ -195,9 +199,12 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
 
   loadOtrosProyectos(): void {
     this.projectService.getMine().subscribe({
-      next: (proyectos) => this.otrosProyectos.set(proyectos),
-      // Silencioso a proposito: es solo el selector del header, no
-      // bloquea nada de la pantalla si falla.
+      next: (proyectos) =>
+        this.otrosProyectos.set(
+          [...proyectos].sort((a, b) =>
+            a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }),
+          ),
+        ),
       error: () => {},
     });
   }
@@ -441,16 +448,12 @@ export class ProyectoDetalleComponent implements OnInit, OnDestroy {
     comentario: string | null,
     onDone?: () => void
   ): void {
-    this.taskService.updateStatus(task.id, newStatus).subscribe({
+    // El comentario viaja junto al cambio de estado: el backend lo guarda
+    // como comentario normal (con su broadcast en vivo) y manda UN solo
+    // aviso por correo/Chat.
+    this.taskService.updateStatus(task.id, newStatus, comentario).subscribe({
       next: (updated) => {
         this.replaceTask(updated);
-        // Mismo servicio/endpoint que el resto de comentarios (ver
-        // TareaCardComponent) - queda como cualquier otro, con su mismo
-        // broadcast en vivo. Sin bloquear el cambio de estado si falla:
-        // ya se marco como atendida, lo unico que se pierde es la nota.
-        if (comentario) {
-          this.commentService.create(task.id, comentario).subscribe();
-        }
         onDone?.();
       },
       error: () => {

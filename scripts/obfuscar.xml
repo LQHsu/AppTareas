@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Config de Obfuscar para el backend. No se usa directo: scripts/build-backend.ps1
+  reemplaza @IN@/@OUT@ y lo corre sobre el output de "dotnet publish".
+
+  Criterio: se ofuscan solo los miembros/tipos NO publicos (internal/private)
+  con KeepPublicApi, porque lo publico lo consumen por reflexion cosas que
+  no se pueden romper: controllers (rutas), DTOs (nombres JSON), entidades
+  de EF Core y migraciones (nombres de tabla/columna), metodos del Hub de
+  SignalR y binding de IOptions. Los .pdb no se envian (ver build-backend.ps1).
+-->
+<Obfuscator>
+  <Var name="InPath" value="@IN@" />
+  <Var name="OutPath" value="@OUT@" />
+  <Var name="ExtraFrameworkFolders" value="@FRAMEWORKS@" />
+  <Var name="KeepPublicApi" value="true" />
+  <Var name="HidePrivateApi" value="true" />
+  <Var name="RenameProperties" value="true" />
+  <Var name="RenameEvents" value="true" />
+  <Var name="RenameFields" value="true" />
+  <Var name="HideStrings" value="true" />
+  <Var name="OptimizeMethods" value="true" />
+  <Var name="SuppressIldasm" value="true" />
+  <Var name="UseUnicodeNames" value="false" />
+  <Var name="ReuseNames" value="true" />
+  <Var name="RegenerateDebugInfo" value="false" />
+  <Var name="MarkedOnly" value="false" />
+
+  <!-- SkipType en tipos anonimos: se serializan a JSON (p. ej. el payload a
+       Google Chat y /health), el nombre de sus propiedades es contrato. -->
+  <Module file="$(InPath)\TaskManager.Api.dll">
+    <SkipType name="*AnonymousType*" skipProperties="true" skipFields="true" skipMethods="true" />
+  </Module>
+  <Module file="$(InPath)\TaskManager.Domain.dll">
+    <SkipType name="*AnonymousType*" skipProperties="true" skipFields="true" skipMethods="true" />
+  </Module>
+  <Module file="$(InPath)\TaskManager.Infrastructure.dll">
+    <SkipType name="*AnonymousType*" skipProperties="true" skipFields="true" skipMethods="true" />
+  </Module>
+</Obfuscator>

@@ -17,6 +17,8 @@ namespace TaskManager.Api.Controllers;
 public class TasksController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private const int MaxCommentLength = 4000;
+
     private readonly IHubContext<TaskHub> _hub;
     private readonly TaskNotificationService _notifications;
 
@@ -452,7 +454,36 @@ public class TasksController : ControllerBase
 
         CambiarEstado(task, userId, dto.Status);
 
+        // Atendida con nota: el comentario se guarda en la misma
+        // transaccion que el cambio de estado, y el aviso de mas abajo lo
+        // incluye (un solo correo/Chat en lugar de dos).
+        TaskComment? comentario = null;
+        var textoComentario = dto.Status == TaskItemStatus.Atendida ? dto.Comment?.Trim() : null;
+        if (!string.IsNullOrEmpty(textoComentario))
+        {
+            if (textoComentario.Length > MaxCommentLength)
+                return BadRequest($"El comentario excede el limite de {MaxCommentLength} caracteres.");
+
+            comentario = new TaskComment
+            {
+                Id = Guid.NewGuid(),
+                TaskId = task.Id,
+                UserId = userId,
+                Content = textoComentario,
+                CreatedAt = DateTime.UtcNow,
+            };
+            _db.TaskComments.Add(comentario);
+        }
+
         await _db.SaveChangesAsync();
+
+        if (comentario is not null)
+        {
+            var autor = await _db.Users.FirstAsync(u => u.Id == userId);
+            await NotificarEvento(task, new TaskCommentDto(
+                comentario.Id, comentario.TaskId, comentario.UserId,
+                autor.FullName, comentario.Content, comentario.CreatedAt), "CommentAdded");
+        }
 
         // Se reanuda: avisar a quien la tiene asignada (si sigue
         // habiendo alguien asignado) que ya puede volver a trabajar en
@@ -476,7 +507,7 @@ public class TasksController : ControllerBase
 
         if (dto.Status == TaskItemStatus.Atendida)
         {
-            await _notifications.NotifyTaskAttendedAsync(task, userId);
+            await _notifications.NotifyTaskAttendedAsync(task, userId, comentario?.Content);
         }
 
         // Volver a revisar: aviso inverso, para quien tiene la tarea

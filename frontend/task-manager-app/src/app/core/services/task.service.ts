@@ -201,8 +201,10 @@ export class TaskService {
     return this.http.post<TaskItemDto>(this.baseUrl, dto);
   }
 
-  updateStatus(taskId: string, status: TaskItemStatus): Observable<TaskItemDto> {
-    return this.http.patch<TaskItemDto>(`${this.baseUrl}/${taskId}/status`, { status });
+  // comment: nota opcional, solo se usa al pasar a Atendida - el backend
+  // la guarda como comentario y la incluye en el aviso de "atendida".
+  updateStatus(taskId: string, status: TaskItemStatus, comment: string | null = null): Observable<TaskItemDto> {
+    return this.http.patch<TaskItemDto>(`${this.baseUrl}/${taskId}/status`, { status, comment });
   }
 
   // Transicion automatica Asignada -> Leida: se llama al abrir el modal

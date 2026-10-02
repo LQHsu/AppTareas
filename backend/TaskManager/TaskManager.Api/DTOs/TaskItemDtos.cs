@@ -59,7 +59,10 @@ public record CreateTaskDto(
     DateTime? NotificarEn = null
 );
 
-public record UpdateTaskStatusDto(TaskItemStatus Status);
+// Comment: nota opcional que solo se usa al pasar a Atendida (ver
+// TasksController.UpdateStatus) - viaja junto al cambio de estado para que
+// el aviso por correo/Chat sea UNO solo, no "atendida" + "comentario".
+public record UpdateTaskStatusDto(TaskItemStatus Status, string? Comment = null);
 
 // AssignedToId nulo = quitar la asignacion (vuelve a quedar sin asignar).
 // NotificarEn: igual que en CreateTaskDto.

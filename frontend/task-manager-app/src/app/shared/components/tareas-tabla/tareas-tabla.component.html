@@ -9,6 +9,12 @@
     />
   </div>
 
+  <select class="filtro-estados__boton" aria-label="Filtrar por rol" (change)="onRolFiltro($event)">
+    <option value="">Rol: todos</option>
+    <option value="asignada">Asignada a mí</option>
+    <option value="creada">Creada por mí</option>
+  </select>
+
   <button
     type="button"
     class="filtro-estados__boton"
